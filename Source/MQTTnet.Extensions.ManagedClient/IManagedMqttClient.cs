@@ -10,11 +10,13 @@ namespace MQTTnet.Extensions.ManagedClient
         bool IsStarted { get; }
         bool IsConnected { get; }
         int PendingApplicationMessagesCount { get; }
+        IManagedMqttClientOptions Options { get; }
 
         event EventHandler<MqttClientConnectedEventArgs> Connected;
         event EventHandler<MqttClientDisconnectedEventArgs> Disconnected;
 
         event EventHandler<ApplicationMessageProcessedEventArgs> ApplicationMessageProcessed;
+        event EventHandler<ApplicationMessageSkippedEventArgs> ApplicationMessageSkipped;
 
         event EventHandler<MqttManagedProcessFailedEventArgs> ConnectingFailed;
         event EventHandler<MqttManagedProcessFailedEventArgs> SynchronizingSubscriptionsFailed;

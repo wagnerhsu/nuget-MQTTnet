@@ -25,7 +25,7 @@ MQTTnet is a high performance .NET library for MQTT based communication. It prov
 * Performance optimized (processing ~70.000 messages / second)*
 * Interfaces included for mocking and testing
 * Access to internal trace messages
-* Unit tested (~90 tests)
+* Unit tested (~100 tests)
 
 \* Tested on local machine (Intel i7 8700K) with MQTTnet client and server running in the same process using the TCP channel. The app for verification is part of this repository and stored in _/Tests/MQTTnet.TestApp.NetCore_.
 
@@ -79,7 +79,7 @@ Please find examples and the documentation at the Wiki of this repository (<http
 If you want to contribute to this project just create a pull request. But only pull requests which are matching the code style of this library will be accepted. Before creating a pull request please have a look at the library to get an overview of the required style.
 Also additions and updates in the Wiki are welcome.
 
-This project also listed at Open Collective (https://opencollective.com/mqttnet).
+**This project, like all projects requires time and money.  If you feel compelled to support the development team, you can do so through Open Collective (https://opencollective.com/mqttnet)**.
 
 ## References
 

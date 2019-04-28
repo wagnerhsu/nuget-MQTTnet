@@ -23,13 +23,12 @@ namespace MQTTnet.Client
         private readonly IMqttClientAdapterFactory _adapterFactory;
         private readonly IMqttNetChildLogger _logger;
 
-        private IMqttClientOptions _options;
         private CancellationTokenSource _cancellationTokenSource;
         internal Task _packetReceiverTask;
         internal Task _keepAliveMessageSenderTask;
         private IMqttChannelAdapter _adapter;
         private bool _cleanDisconnectInitiated;
-        private int _disconnectGate;
+        private long _disconnectGate;
 
         public MqttClient(IMqttClientAdapterFactory channelFactory, IMqttNetLogger logger)
         {
@@ -44,6 +43,7 @@ namespace MQTTnet.Client
         public event EventHandler<MqttApplicationMessageReceivedEventArgs> ApplicationMessageReceived;
 
         public bool IsConnected { get; private set; }
+        public IMqttClientOptions Options { get; private set; }
 
         public async Task<MqttClientConnectResult> ConnectAsync(IMqttClientOptions options)
         {
@@ -54,7 +54,8 @@ namespace MQTTnet.Client
 
             try
             {
-                _options = options;
+                Options = options;
+
                 _packetIdentifierProvider.Reset();
                 _packetDispatcher.Reset();
 
@@ -62,8 +63,8 @@ namespace MQTTnet.Client
                 _disconnectGate = 0;
                 _adapter = _adapterFactory.CreateClientAdapter(options, _logger);
 
-                _logger.Verbose($"Trying to connect with server ({_options.ChannelOptions}).");
-                await _adapter.ConnectAsync(_options.CommunicationTimeout, _cancellationTokenSource.Token).ConfigureAwait(false);
+                _logger.Verbose($"Trying to connect with server ({Options.ChannelOptions}).");
+                await _adapter.ConnectAsync(Options.CommunicationTimeout, _cancellationTokenSource.Token).ConfigureAwait(false);
                 _logger.Verbose("Connection with server established.");
 
                 StartReceivingPackets(_cancellationTokenSource.Token);
@@ -73,7 +74,7 @@ namespace MQTTnet.Client
 
                 _sendTracker.Restart();
 
-                if (_options.KeepAlivePeriod != TimeSpan.Zero)
+                if (Options.KeepAlivePeriod != TimeSpan.Zero)
                 {
                     StartSendingKeepAliveMessages(_cancellationTokenSource.Token);
                 }
@@ -139,7 +140,7 @@ namespace MQTTnet.Client
             return subscribePacket.TopicFilters.Select((t, i) => new MqttSubscribeResult(t, response.SubscribeReturnCodes[i])).ToList();
         }
 
-        public async Task UnsubscribeAsync(IEnumerable<string> topicFilters)
+        public Task UnsubscribeAsync(IEnumerable<string> topicFilters)
         {
             if (topicFilters == null) throw new ArgumentNullException(nameof(topicFilters));
 
@@ -151,7 +152,7 @@ namespace MQTTnet.Client
                 TopicFilters = topicFilters.ToList()
             };
 
-            await SendAndReceiveAsync<MqttUnsubAckPacket>(unsubscribePacket, _cancellationTokenSource.Token).ConfigureAwait(false);
+            return SendAndReceiveAsync<MqttUnsubAckPacket>(unsubscribePacket, _cancellationTokenSource.Token);
         }
 
         public Task PublishAsync(MqttApplicationMessage applicationMessage)
@@ -197,11 +198,11 @@ namespace MQTTnet.Client
         {
             var connectPacket = new MqttConnectPacket
             {
-                ClientId = _options.ClientId,
-                Username = _options.Credentials?.Username,
-                Password = _options.Credentials?.Password,
-                CleanSession = _options.CleanSession,
-                KeepAlivePeriod = (ushort)_options.KeepAlivePeriod.TotalSeconds,
+                ClientId = Options.ClientId,
+                Username = Options.Credentials?.Username,
+                Password = Options.Credentials?.Password,
+                CleanSession = Options.CleanSession,
+                KeepAlivePeriod = (ushort)Options.KeepAlivePeriod.TotalSeconds,
                 WillMessage = willApplicationMessage
             };
 
@@ -216,7 +217,7 @@ namespace MQTTnet.Client
 
         private void ThrowIfNotConnected()
         {
-            if (!IsConnected) throw new MqttCommunicationException("The client is not connected.");
+            if (!IsConnected || Interlocked.Read(ref _disconnectGate) == 1) throw new MqttCommunicationException("The client is not connected.");
         }
 
         private void ThrowIfConnected(string message)
@@ -234,14 +235,14 @@ namespace MQTTnet.Client
 
             try
             {
-                await WaitForTaskAsync(_packetReceiverTask, sender).ConfigureAwait(false);
-                await WaitForTaskAsync(_keepAliveMessageSenderTask, sender).ConfigureAwait(false);
-
                 if (_adapter != null)
                 {
-                    await _adapter.DisconnectAsync(_options.CommunicationTimeout, CancellationToken.None).ConfigureAwait(false);
+                    await _adapter.DisconnectAsync(Options.CommunicationTimeout, CancellationToken.None).ConfigureAwait(false);
                 }
 
+                await WaitForTaskAsync(_packetReceiverTask, sender).ConfigureAwait(false);
+                await WaitForTaskAsync(_keepAliveMessageSenderTask, sender).ConfigureAwait(false);
+                
                 _logger.Verbose("Disconnected from adapter.");
             }
             catch (Exception adapterException)
@@ -303,7 +304,7 @@ namespace MQTTnet.Client
             try
             {
                 await _adapter.SendPacketAsync(requestPacket, cancellationToken).ConfigureAwait(false);
-                var respone = await Internal.TaskExtensions.TimeoutAfterAsync(ct => packetAwaiter.Task, _options.CommunicationTimeout, cancellationToken).ConfigureAwait(false);
+                var respone = await Internal.TaskExtensions.TimeoutAfterAsync(ct => packetAwaiter.Task, Options.CommunicationTimeout, cancellationToken).ConfigureAwait(false);
 
                 return (TResponsePacket)respone;
             }
@@ -320,16 +321,16 @@ namespace MQTTnet.Client
 
         private async Task SendKeepAliveMessagesAsync(CancellationToken cancellationToken)
         {
-            _logger.Verbose("Start sending keep alive packets.");
-
             try
             {
+                _logger.Verbose("Start sending keep alive packets.");
+
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var keepAliveSendInterval = TimeSpan.FromSeconds(_options.KeepAlivePeriod.TotalSeconds * 0.75);
-                    if (_options.KeepAliveSendInterval.HasValue)
+                    var keepAliveSendInterval = TimeSpan.FromSeconds(Options.KeepAlivePeriod.TotalSeconds * 0.75);
+                    if (Options.KeepAliveSendInterval.HasValue)
                     {
-                        keepAliveSendInterval = _options.KeepAliveSendInterval.Value;
+                        keepAliveSendInterval = Options.KeepAliveSendInterval.Value;
                     }
 
                     var waitTime = keepAliveSendInterval - _sendTracker.Elapsed;
@@ -374,10 +375,10 @@ namespace MQTTnet.Client
 
         private async Task ReceivePacketsAsync(CancellationToken cancellationToken)
         {
-            _logger.Verbose("Start receiving packets.");
-
             try
             {
+                _logger.Verbose("Start receiving packets.");
+
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var packet = await _adapter.ReceivePacketAsync(TimeSpan.Zero, cancellationToken)
@@ -500,7 +501,7 @@ namespace MQTTnet.Client
                 () => ReceivePacketsAsync(cancellationToken),
                 cancellationToken,
                 TaskCreationOptions.LongRunning, 
-                TaskScheduler.Default);
+                TaskScheduler.Default).Unwrap();
         }
 
         private void StartSendingKeepAliveMessages(CancellationToken cancellationToken)
@@ -509,7 +510,7 @@ namespace MQTTnet.Client
                 () => SendKeepAliveMessagesAsync(cancellationToken),
                 cancellationToken,
                 TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
+                TaskScheduler.Default).Unwrap();
         }
 
         private void FireApplicationMessageReceivedEvent(MqttPublishPacket publishPacket)
@@ -517,7 +518,7 @@ namespace MQTTnet.Client
             try
             {
                 var applicationMessage = publishPacket.ToApplicationMessage();
-                ApplicationMessageReceived?.Invoke(this, new MqttApplicationMessageReceivedEventArgs(_options.ClientId, applicationMessage));
+                ApplicationMessageReceived?.Invoke(this, new MqttApplicationMessageReceivedEventArgs(Options.ClientId, applicationMessage));
             }
             catch (Exception exception)
             {
