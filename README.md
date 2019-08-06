@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://github.com/chkr1011/MQTTnet/blob/master/Images/Logo_128x128.png?raw=true" width="128">
+<img src="https://github.com/chkr1011/MQTTnet/blob/master/Images/icon_det_256.png?raw=true" width="196">
 <br/>
 <br/>
 </p>
@@ -9,6 +9,7 @@
 [![BCH compliance](https://bettercodehub.com/edge/badge/chkr1011/MQTTnet?branch=master)](https://bettercodehub.com/)
 [![OpenCollective](https://opencollective.com/mqttnet/backers/badge.svg)](https://opencollective.com/mqttnet) 
 [![OpenCollective](https://opencollective.com/mqttnet/sponsors/badge.svg)](https://opencollective.com/mqttnet) [![Join the chat at https://gitter.im/MQTTnet/community](https://badges.gitter.im/MQTTnet/community.svg)](https://gitter.im/MQTTnet/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://raw.githubusercontent.com/chkr1011/MQTTnet/master/LICENSE)
 
 # MQTTnet
 
@@ -26,7 +27,7 @@ MQTTnet is a high performance .NET library for MQTT based communication. It prov
 * Uniform API across all supported versions of the MQTT protocol
 * Interfaces included for mocking and testing
 * Access to internal trace messages
-* Unit tested (~200 tests)
+* Unit tested (~210 tests)
 * No external dependencies
 
 \* Tested on local machine (Intel i7 8700K) with MQTTnet client and server running in the same process using the TCP channel. The app for verification is part of this repository and stored in _/Tests/MQTTnet.TestApp.NetCore_.
@@ -103,6 +104,8 @@ This library is used in the following projects:
 * MQTT Client Rx (Wrapper for Reactive Extensions, <https://github.com/1iveowl/MQTTClient.rx>)
 * MQTT Tester (MQTT client test app for [Android](https://play.google.com/store/apps/details?id=com.liveowl.mqtttester) and [iOS](https://itunes.apple.com/us/app/mqtt-tester/id1278621826?mt=8))
 * Wirehome.Core (Open Source Home Automation system for .NET Core, <https://github.com/chkr1011/Wirehome.Core>)
+
+Further projects using this project can be found under https://github.com/chkr1011/MQTTnet/network/dependents.
 
 If you use this library and want to see your project here please create a pull request.
 

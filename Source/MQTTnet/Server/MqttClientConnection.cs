@@ -7,6 +7,7 @@ using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 using MQTTnet.Exceptions;
 using MQTTnet.Formatter;
+using MQTTnet.Internal;
 using MQTTnet.PacketDispatcher;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
@@ -14,7 +15,7 @@ using MQTTnet.Server.Status;
 
 namespace MQTTnet.Server
 {
-    public class MqttClientConnection : IMqttClientSession, IDisposable
+    public class MqttClientConnection : IDisposable
     {
         private readonly MqttPacketIdentifierProvider _packetIdentifierProvider = new MqttPacketIdentifierProvider();
         private readonly MqttPacketDispatcher _packetDispatcher = new MqttPacketDispatcher();
@@ -31,11 +32,12 @@ namespace MQTTnet.Server
         private readonly IMqttDataConverter _dataConverter;
         private readonly string _endpoint;
         private readonly MqttConnectPacket _connectPacket;
+        private readonly DateTime _connectedTimestamp;
 
         private Task<MqttClientDisconnectType> _packageReceiverTask;
         private DateTime _lastPacketReceivedTimestamp;
         private DateTime _lastNonKeepAlivePacketReceivedTimestamp;
-
+        
         private long _receivedPacketsCount;
         private long _sentPacketsCount = 1; // Start with 1 because the CONNECT packet is not counted anywhere.
         private long _receivedApplicationMessagesCount;
@@ -63,9 +65,10 @@ namespace MQTTnet.Server
             if (logger == null) throw new ArgumentNullException(nameof(logger));
             _logger = logger.CreateChildLogger(nameof(MqttClientConnection));
 
-            _keepAliveMonitor = new MqttClientKeepAliveMonitor(this, _logger);
+            _keepAliveMonitor = new MqttClientKeepAliveMonitor(_connectPacket.ClientId, StopAsync, _logger);
 
-            _lastPacketReceivedTimestamp = DateTime.UtcNow;
+            _connectedTimestamp = DateTime.UtcNow;
+            _lastPacketReceivedTimestamp = _connectedTimestamp;
             _lastNonKeepAlivePacketReceivedTimestamp = _lastPacketReceivedTimestamp;
         }
 
@@ -84,6 +87,11 @@ namespace MQTTnet.Server
             }
         }
 
+        public void ResetStatistics()
+        {
+            _channelAdapter.ResetStatistics();
+        }
+
         public void FillStatus(MqttClientStatus status)
         {
             status.ClientId = ClientId;
@@ -96,6 +104,7 @@ namespace MQTTnet.Server
             status.ReceivedPacketsCount = Interlocked.Read(ref _receivedPacketsCount);
             status.SentPacketsCount = Interlocked.Read(ref _sentPacketsCount);
 
+            status.ConnectedTimestamp = _connectedTimestamp;
             status.LastPacketReceivedTimestamp = _lastPacketReceivedTimestamp;
             status.LastNonKeepAlivePacketReceivedTimestamp = _lastNonKeepAlivePacketReceivedTimestamp;
 
@@ -126,9 +135,7 @@ namespace MQTTnet.Server
 
                 Session.WillMessage = _connectPacket.WillMessage;
 
-#pragma warning disable 4014
-                Task.Run(() => SendPendingPacketsAsync(_cancellationToken.Token), _cancellationToken.Token);
-#pragma warning restore 4014
+                Task.Run(() => SendPendingPacketsAsync(_cancellationToken.Token), _cancellationToken.Token).Forget(_logger);
 
                 // TODO: Change to single thread in SessionManager. Or use SessionManager and stats from KeepAliveMonitor.
                 _keepAliveMonitor.Start(_connectPacket.KeepAlivePeriod, _cancellationToken.Token);
