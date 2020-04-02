@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Net.Security;
 using System.Security.Authentication;
 
 namespace MQTTnet.Server
@@ -56,7 +57,7 @@ namespace MQTTnet.Server
             _options.DefaultEndpointOptions.IsEnabled = false;
             return this;
         }
-        
+
         public MqttServerOptionsBuilder WithEncryptedEndpoint()
         {
             _options.TlsEndpointOptions.IsEnabled = true;
@@ -81,9 +82,10 @@ namespace MQTTnet.Server
             return this;
         }
 
-        public MqttServerOptionsBuilder WithEncryptionCertificate(byte[] value)
+        public MqttServerOptionsBuilder WithEncryptionCertificate(byte[] value, IMqttServerCertificateCredentials credentials = null)
         {
             _options.TlsEndpointOptions.Certificate = value;
+            _options.TlsEndpointOptions.CertificateCredentials = credentials;
             return this;
         }
 
@@ -93,15 +95,39 @@ namespace MQTTnet.Server
             return this;
         }
 
+#if !WINDOWS_UWP
+        public MqttServerOptionsBuilder WithClientCertificate(RemoteCertificateValidationCallback validationCallback = null, bool checkCertificateRevocation = false)
+        {
+            _options.TlsEndpointOptions.ClientCertificateRequired = true;
+            _options.TlsEndpointOptions.CheckCertificateRevocation = checkCertificateRevocation;
+            _options.TlsEndpointOptions.RemoteCertificateValidationCallback = validationCallback;
+            return this;
+        }
+#endif
+
         public MqttServerOptionsBuilder WithoutEncryptedEndpoint()
         {
             _options.TlsEndpointOptions.IsEnabled = false;
             return this;
         }
-        
+
+#if !WINDOWS_UWP
+        public MqttServerOptionsBuilder WithRemoteCertificateValidationCallback(RemoteCertificateValidationCallback value)
+        {
+            _options.TlsEndpointOptions.RemoteCertificateValidationCallback = value;
+            return this;
+        }
+#endif
+
         public MqttServerOptionsBuilder WithStorage(IMqttServerStorage value)
         {
             _options.Storage = value;
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithRetainedMessagesManager(IMqttRetainedMessagesManager value)
+        {
+            _options.RetainedMessagesManager = value;
             return this;
         }
 
@@ -132,6 +158,12 @@ namespace MQTTnet.Server
         public MqttServerOptionsBuilder WithSubscriptionInterceptor(IMqttServerSubscriptionInterceptor value)
         {
             _options.SubscriptionInterceptor = value;
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithUnsubscriptionInterceptor(IMqttServerUnsubscriptionInterceptor value)
+        {
+            _options.UnsubscriptionInterceptor = value;
             return this;
         }
 

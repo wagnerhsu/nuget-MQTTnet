@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using MQTTnet.Adapter;
+﻿using MQTTnet.Adapter;
 using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 using MQTTnet.Exceptions;
@@ -12,6 +8,10 @@ using MQTTnet.PacketDispatcher;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using MQTTnet.Server.Status;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MQTTnet.Server
 {
@@ -21,7 +21,7 @@ namespace MQTTnet.Server
         private readonly MqttPacketDispatcher _packetDispatcher = new MqttPacketDispatcher();
         private readonly CancellationTokenSource _cancellationToken = new CancellationTokenSource();
 
-        private readonly MqttRetainedMessagesManager _retainedMessagesManager;
+        private readonly IMqttRetainedMessagesManager _retainedMessagesManager;
         private readonly MqttClientKeepAliveMonitor _keepAliveMonitor;
         private readonly MqttClientSessionsManager _sessionsManager;
 
@@ -31,13 +31,12 @@ namespace MQTTnet.Server
         private readonly IMqttChannelAdapter _channelAdapter;
         private readonly IMqttDataConverter _dataConverter;
         private readonly string _endpoint;
-        private readonly MqttConnectPacket _connectPacket;
         private readonly DateTime _connectedTimestamp;
 
         private Task<MqttClientDisconnectType> _packageReceiverTask;
         private DateTime _lastPacketReceivedTimestamp;
         private DateTime _lastNonKeepAlivePacketReceivedTimestamp;
-        
+
         private long _receivedPacketsCount;
         private long _sentPacketsCount = 1; // Start with 1 because the CONNECT packet is not counted anywhere.
         private long _receivedApplicationMessagesCount;
@@ -49,30 +48,32 @@ namespace MQTTnet.Server
             MqttClientSession session,
             IMqttServerOptions serverOptions,
             MqttClientSessionsManager sessionsManager,
-            MqttRetainedMessagesManager retainedMessagesManager,
+            IMqttRetainedMessagesManager retainedMessagesManager,
             IMqttNetChildLogger logger)
         {
             Session = session ?? throw new ArgumentNullException(nameof(session));
             _serverOptions = serverOptions ?? throw new ArgumentNullException(nameof(serverOptions));
             _sessionsManager = sessionsManager ?? throw new ArgumentNullException(nameof(sessionsManager));
             _retainedMessagesManager = retainedMessagesManager ?? throw new ArgumentNullException(nameof(retainedMessagesManager));
-            
+
             _channelAdapter = channelAdapter ?? throw new ArgumentNullException(nameof(channelAdapter));
             _dataConverter = _channelAdapter.PacketFormatterAdapter.DataConverter;
             _endpoint = _channelAdapter.Endpoint;
-            _connectPacket = connectPacket ?? throw new ArgumentNullException(nameof(connectPacket));
+            ConnectPacket = connectPacket ?? throw new ArgumentNullException(nameof(connectPacket));
 
             if (logger == null) throw new ArgumentNullException(nameof(logger));
             _logger = logger.CreateChildLogger(nameof(MqttClientConnection));
 
-            _keepAliveMonitor = new MqttClientKeepAliveMonitor(_connectPacket.ClientId, StopAsync, _logger);
+            _keepAliveMonitor = new MqttClientKeepAliveMonitor(ConnectPacket.ClientId, StopAsync, _logger);
 
             _connectedTimestamp = DateTime.UtcNow;
             _lastPacketReceivedTimestamp = _connectedTimestamp;
             _lastNonKeepAlivePacketReceivedTimestamp = _lastPacketReceivedTimestamp;
         }
 
-        public string ClientId => _connectPacket.ClientId;
+        public MqttConnectPacket ConnectPacket { get; }
+
+        public string ClientId => ConnectPacket.ClientId;
 
         public MqttClientSession Session { get; }
 
@@ -111,42 +112,38 @@ namespace MQTTnet.Server
             status.BytesSent = _channelAdapter.BytesSent;
             status.BytesReceived = _channelAdapter.BytesReceived;
         }
-        
+
         public void Dispose()
         {
             _cancellationToken.Dispose();
         }
 
-        public Task<MqttClientDisconnectType> RunAsync()
+        public Task<MqttClientDisconnectType> RunAsync(MqttConnectionValidatorContext connectionValidatorContext)
         {
-            _packageReceiverTask = RunInternalAsync();
+            _packageReceiverTask = RunInternalAsync(connectionValidatorContext);
             return _packageReceiverTask;
         }
 
-        private async Task<MqttClientDisconnectType> RunInternalAsync()
+        private async Task<MqttClientDisconnectType> RunInternalAsync(MqttConnectionValidatorContext connectionValidatorContext)
         {
             var disconnectType = MqttClientDisconnectType.NotClean;
             try
             {
                 _logger.Info("Client '{0}': Session started.", ClientId);
-                
+
                 _channelAdapter.ReadingPacketStartedCallback = OnAdapterReadingPacketStarted;
                 _channelAdapter.ReadingPacketCompletedCallback = OnAdapterReadingPacketCompleted;
 
-                Session.WillMessage = _connectPacket.WillMessage;
+                Session.WillMessage = ConnectPacket.WillMessage;
 
                 Task.Run(() => SendPendingPacketsAsync(_cancellationToken.Token), _cancellationToken.Token).Forget(_logger);
 
                 // TODO: Change to single thread in SessionManager. Or use SessionManager and stats from KeepAliveMonitor.
-                _keepAliveMonitor.Start(_connectPacket.KeepAlivePeriod, _cancellationToken.Token);
+                _keepAliveMonitor.Start(ConnectPacket.KeepAlivePeriod, _cancellationToken.Token);
 
                 await SendAsync(
-                    new MqttConnAckPacket
-                    {
-                        ReturnCode = MqttConnectReturnCode.ConnectionAccepted,
-                        ReasonCode = MqttConnectReasonCode.Success,
-                        IsSessionPresent = !Session.IsCleanSession
-                    }).ConfigureAwait(false);
+                    _channelAdapter.PacketFormatterAdapter.DataConverter.CreateConnAckPacket(connectionValidatorContext)
+                    ).ConfigureAwait(false);
 
                 Session.IsCleanSession = false;
 
@@ -228,7 +225,7 @@ namespace MQTTnet.Server
                 }
                 else
                 {
-                    _logger.Error(exception, "Client '{0}': Unhandled exception while receiving client packets.", ClientId);
+                    _logger.Error(exception, "Client '{0}': Error while receiving client packets.", ClientId);
                 }
 
                 StopInternal();
@@ -247,7 +244,7 @@ namespace MQTTnet.Server
                 _channelAdapter.ReadingPacketCompletedCallback = null;
 
                 _logger.Info("Client '{0}': Session stopped.", ClientId);
-                
+
                 _packageReceiverTask = null;
             }
 
@@ -271,7 +268,7 @@ namespace MQTTnet.Server
         private async Task HandleIncomingSubscribePacketAsync(MqttSubscribePacket subscribePacket)
         {
             // TODO: Let the channel adapter create the packet.
-            var subscribeResult = await Session.SubscriptionsManager.SubscribeAsync(subscribePacket).ConfigureAwait(false);
+            var subscribeResult = await Session.SubscriptionsManager.SubscribeAsync(subscribePacket, ConnectPacket).ConfigureAwait(false);
 
             await SendAsync(subscribeResult.ResponsePacket).ConfigureAwait(false);
 
@@ -440,9 +437,8 @@ namespace MQTTnet.Server
                 {
                     _logger.Warning(exception, "Sending publish packet failed: Communication exception (ClientId: {0}).", ClientId);
                 }
-                else if (exception is OperationCanceledException && _cancellationToken.Token.IsCancellationRequested)
+                else if (exception is OperationCanceledException)
                 {
-                    // The cancellation was triggered externally.
                 }
                 else
                 {

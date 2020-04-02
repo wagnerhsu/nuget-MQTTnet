@@ -33,6 +33,7 @@ namespace MQTTnet.Server.Mqtt
         private readonly MqttServerConnectionValidator _mqttConnectionValidator;
         private readonly IMqttServer _mqttServer;
         private readonly MqttSubscriptionInterceptor _mqttSubscriptionInterceptor;
+        private readonly MqttUnsubscriptionInterceptor _mqttUnsubscriptionInterceptor;
         private readonly PythonScriptHostService _pythonScriptHostService;
         private readonly MqttWebSocketServerAdapter _webSocketServerAdapter;
 
@@ -45,9 +46,10 @@ namespace MQTTnet.Server.Mqtt
             MqttClientUnsubscribedTopicHandler mqttClientUnsubscribedTopicHandler,
             MqttServerConnectionValidator mqttConnectionValidator,
             MqttSubscriptionInterceptor mqttSubscriptionInterceptor,
+            MqttUnsubscriptionInterceptor mqttUnsubscriptionInterceptor,
             MqttApplicationMessageInterceptor mqttApplicationMessageInterceptor,
             MqttServerStorage mqttServerStorage,
-            PythonScriptHostService pythonScriptHostService,            
+            PythonScriptHostService pythonScriptHostService,
             ILogger<MqttServerService> logger)
         {
             _settings = mqttSettings ?? throw new ArgumentNullException(nameof(mqttSettings));
@@ -57,6 +59,7 @@ namespace MQTTnet.Server.Mqtt
             _mqttClientUnsubscribedTopicHandler = mqttClientUnsubscribedTopicHandler ?? throw new ArgumentNullException(nameof(mqttClientUnsubscribedTopicHandler));
             _mqttConnectionValidator = mqttConnectionValidator ?? throw new ArgumentNullException(nameof(mqttConnectionValidator));
             _mqttSubscriptionInterceptor = mqttSubscriptionInterceptor ?? throw new ArgumentNullException(nameof(mqttSubscriptionInterceptor));
+            _mqttUnsubscriptionInterceptor = mqttUnsubscriptionInterceptor ?? throw new ArgumentNullException(nameof(mqttUnsubscriptionInterceptor));
             _mqttApplicationMessageInterceptor = mqttApplicationMessageInterceptor ?? throw new ArgumentNullException(nameof(mqttApplicationMessageInterceptor));
             _mqttServerStorage = mqttServerStorage ?? throw new ArgumentNullException(nameof(mqttServerStorage));
             _pythonScriptHostService = pythonScriptHostService ?? throw new ArgumentNullException(nameof(pythonScriptHostService));
@@ -178,8 +181,9 @@ namespace MQTTnet.Server.Mqtt
                 .WithConnectionValidator(_mqttConnectionValidator)
                 .WithApplicationMessageInterceptor(_mqttApplicationMessageInterceptor)
                 .WithSubscriptionInterceptor(_mqttSubscriptionInterceptor)
+                .WithUnsubscriptionInterceptor(_mqttUnsubscriptionInterceptor)
                 .WithStorage(_mqttServerStorage);
-            
+
             // Configure unencrypted connections
             if (_settings.TcpEndPoint.Enabled)
             {
@@ -210,9 +214,23 @@ namespace MQTTnet.Server.Mqtt
             {
                 options
                     .WithEncryptedEndpoint()
-                    .WithEncryptionSslProtocol(SslProtocols.Tls12)
-                    .WithEncryptionCertificate(_settings.EncryptedTcpEndPoint.ReadCertificate());
+                    .WithEncryptionSslProtocol(SslProtocols.Tls12);
+                
+                if (!string.IsNullOrEmpty(_settings.EncryptedTcpEndPoint?.Certificate?.Path))
+                {
+                    IMqttServerCertificateCredentials certificateCredentials = null;
 
+                    if (!string.IsNullOrEmpty(_settings.EncryptedTcpEndPoint?.Certificate?.Password))
+                    {
+                        certificateCredentials = new MqttServerCertificateCredentials
+                        {
+                            Password = _settings.EncryptedTcpEndPoint.Certificate.Password
+                        };
+                    }
+
+                    options.WithEncryptionCertificate(_settings.EncryptedTcpEndPoint.Certificate.ReadCertificate(), certificateCredentials);
+                }
+                
                 if (_settings.EncryptedTcpEndPoint.TryReadIPv4(out var address4))
                 {
                     options.WithEncryptedEndpointBoundIPAddress(address4);
