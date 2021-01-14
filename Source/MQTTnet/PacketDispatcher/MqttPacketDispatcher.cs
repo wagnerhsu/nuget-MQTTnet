@@ -19,7 +19,7 @@ namespace MQTTnet.PacketDispatcher
             _awaiters.Clear();
         }
 
-        public void Dispatch(MqttBasePacket packet)
+        public bool TryDispatch(MqttBasePacket packet)
         {
             if (packet == null) throw new ArgumentNullException(nameof(packet));
 
@@ -30,13 +30,13 @@ namespace MQTTnet.PacketDispatcher
                     packetAwaiter.Value.Fail(new MqttUnexpectedDisconnectReceivedException(disconnectPacket));
                 }
 
-                return;
+                return true;
             }
 
             ushort identifier = 0;
-            if (packet is IMqttPacketWithIdentifier packetWithIdentifier && packetWithIdentifier.PacketIdentifier.HasValue)
+            if (packet is IMqttPacketWithIdentifier packetWithIdentifier && packetWithIdentifier.PacketIdentifier > 0)
             {
-                identifier = packetWithIdentifier.PacketIdentifier.Value;
+                identifier = packetWithIdentifier.PacketIdentifier;
             }
 
             var type = packet.GetType();
@@ -45,13 +45,23 @@ namespace MQTTnet.PacketDispatcher
             if (_awaiters.TryRemove(key, out var awaiter))
             {
                 awaiter.Complete(packet);
-                return;
+                return true;
             }
 
-            throw new MqttProtocolViolationException($"Received packet '{packet}' at an unexpected time.");
+            return false;
         }
 
-        public void Reset()
+        public void Dispatch(MqttBasePacket packet)
+        {
+            if (packet == null) throw new ArgumentNullException(nameof(packet));
+
+            if (!TryDispatch(packet))
+            {
+                throw new MqttProtocolViolationException($"Received packet '{packet}' at an unexpected time.");
+            }
+        }
+
+        public void Cancel()
         {
             foreach (var awaiter in _awaiters)
             {

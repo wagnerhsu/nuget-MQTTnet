@@ -1,13 +1,16 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MQTTnet.Client.Options;
 using MQTTnet.LowLevelClient;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using MQTTnet.Tests.Mockups;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MQTTnet.Exceptions;
 
 namespace MQTTnet.Tests
 {
@@ -17,11 +20,23 @@ namespace MQTTnet.Tests
         public TestContext TestContext { get; set; }
 
         [TestMethod]
+        [ExpectedException(typeof(MqttCommunicationException))]
+        public async Task Connect_To_Not_Existing_Server()
+        {
+            var client = new MqttFactory().CreateLowLevelMqttClient();
+            var options = new MqttClientOptionsBuilder()
+                .WithTcpServer("localhost")
+                .Build();
+
+            await client.ConnectAsync(options, CancellationToken.None).ConfigureAwait(false);
+        }
+
+        [TestMethod]
         public async Task Connect_And_Disconnect()
         {
             using (var testEnvironment = new TestEnvironment(TestContext))
             {
-                var server = await testEnvironment.StartServerAsync();
+                await testEnvironment.StartServerAsync();
 
                 var factory = new MqttFactory();
                 var lowLevelClient = factory.CreateLowLevelMqttClient();
@@ -37,7 +52,7 @@ namespace MQTTnet.Tests
         {
             using (var testEnvironment = new TestEnvironment(TestContext))
             {
-                var server = await testEnvironment.StartServerAsync();
+                await testEnvironment.StartServerAsync();
 
                 var factory = new MqttFactory();
                 var lowLevelClient = factory.CreateLowLevelMqttClient();
@@ -58,7 +73,7 @@ namespace MQTTnet.Tests
         {
             using (var testEnvironment = new TestEnvironment(TestContext))
             {
-                var server = await testEnvironment.StartServerAsync();
+                await testEnvironment.StartServerAsync();
 
                 var factory = new MqttFactory();
                 var lowLevelClient = factory.CreateLowLevelMqttClient();
@@ -76,9 +91,43 @@ namespace MQTTnet.Tests
             }
         }
 
+        [TestMethod]
+        public async Task Loose_Connection()
+        {
+            using (var testEnvironment = new TestEnvironment(TestContext))
+            {
+                testEnvironment.ServerPort = 8364;
+                var server = await testEnvironment.StartServerAsync();
+                var client = await testEnvironment.ConnectLowLevelClientAsync(o => o.WithCommunicationTimeout(TimeSpan.Zero));
+
+                await Authenticate(client).ConfigureAwait(false);
+
+                await server.StopAsync();
+
+                await Task.Delay(1000);
+
+                try
+                {
+                    await client.SendAsync(MqttPingReqPacket.Instance, CancellationToken.None).ConfigureAwait(false);
+                    await client.SendAsync(MqttPingReqPacket.Instance, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (MqttCommunicationException exception)
+                {
+                    Assert.IsTrue(exception.InnerException is SocketException);
+                    return;
+                }
+                catch
+                {
+                    Assert.Fail("Wrong exception type thrown.");
+                }
+
+                Assert.Fail("This MUST fail");
+            }
+        }
+
         async Task<MqttConnAckPacket> Authenticate(ILowLevelMqttClient client)
         {
-            await client.SendAsync(new MqttConnectPacket()
+            await client.SendAsync(new MqttConnectPacket
             {
                 CleanSession = true,
                 ClientId = TestContext.TestName,

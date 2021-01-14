@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MQTTnet.Server
 {
-    public class MqttClientSession
+    public sealed class MqttClientSession
     {
         readonly IMqttNetScopedLogger _logger;
 
@@ -51,14 +51,14 @@ namespace MQTTnet.Server
             var checkSubscriptionsResult = SubscriptionsManager.CheckSubscriptions(applicationMessage.Topic, applicationMessage.QualityOfServiceLevel);
             if (!checkSubscriptionsResult.IsSubscribed)
             {
-                return true;
+                return false;
             }
 
-            _logger.Verbose("Queued application message with topic '{0}' (ClientId: {1}).", applicationMessage.Topic, ClientId);
+            _logger.Verbose("Client '{0}': Queued application message with topic '{1}'.", ClientId, applicationMessage.Topic);
 
             ApplicationMessagesQueue.Enqueue(applicationMessage, senderClientId, checkSubscriptionsResult.QualityOfServiceLevel, isRetainedApplicationMessage);
 
-            return false;
+            return true;
         }
 
         public async Task SubscribeAsync(ICollection<MqttTopicFilter> topicFilters)

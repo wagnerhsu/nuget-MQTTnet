@@ -8,7 +8,7 @@ using MQTTnet.Packets;
 
 namespace MQTTnet.Formatter
 {
-    public class MqttPacketFormatterAdapter
+    public sealed class MqttPacketFormatterAdapter
     {
         IMqttPacketFormatter _formatter;
                
@@ -77,17 +77,6 @@ namespace MQTTnet.Formatter
             UseProtocolVersion(protocolVersion);
         }
 
-        private void UseProtocolVersion(MqttProtocolVersion protocolVersion)
-        {
-            if (protocolVersion == MqttProtocolVersion.Unknown)
-            {
-                throw new InvalidOperationException("MQTT protocol version is invalid.");
-            }
-
-            ProtocolVersion = protocolVersion;
-            _formatter = GetMqttPacketFormatter(protocolVersion, Writer);
-        }
-
         public static IMqttPacketFormatter GetMqttPacketFormatter(MqttProtocolVersion protocolVersion, IMqttPacketWriter writer)
         {
             if (protocolVersion == MqttProtocolVersion.Unknown)
@@ -116,9 +105,28 @@ namespace MQTTnet.Formatter
             }
         }
 
-        MqttProtocolVersion ParseProtocolVersion(ReceivedMqttPacket receivedMqttPacket)
+        void UseProtocolVersion(MqttProtocolVersion protocolVersion)
+        {
+            if (protocolVersion == MqttProtocolVersion.Unknown)
+            {
+                throw new InvalidOperationException("MQTT protocol version is invalid.");
+            }
+
+            ProtocolVersion = protocolVersion;
+            _formatter = GetMqttPacketFormatter(protocolVersion, Writer);
+        }
+
+        static MqttProtocolVersion ParseProtocolVersion(ReceivedMqttPacket receivedMqttPacket)
         {
             if (receivedMqttPacket == null) throw new ArgumentNullException(nameof(receivedMqttPacket));
+
+            if (receivedMqttPacket.Body.Length < 7)
+            {
+                // 2 byte protocol name length
+                // at least 4 byte protocol name
+                // 1 byte protocol level
+                throw new MqttProtocolViolationException("CONNECT packet must have at least 7 bytes.");
+            }
 
             var protocolName = receivedMqttPacket.Body.ReadStringWithLengthPrefix();
             var protocolLevel = receivedMqttPacket.Body.ReadByte();

@@ -3,17 +3,19 @@ using System.Net;
 using System.Net.Security;
 using System.Security.Authentication;
 using MQTTnet.Certificates;
+using System.Threading.Tasks;
 
 #if !WINDOWS_UWP
 using System.Security.Cryptography.X509Certificates;
 #endif
 
+// ReSharper disable UnusedMember.Global
 namespace MQTTnet.Server
 {
     public class MqttServerOptionsBuilder
     {
         readonly MqttServerOptions _options = new MqttServerOptions();
-
+        
         public MqttServerOptionsBuilder WithConnectionBacklog(int value)
         {
             _options.DefaultEndpointOptions.ConnectionBacklog = value;
@@ -163,6 +165,18 @@ namespace MQTTnet.Server
             return this;
         }
 
+        public MqttServerOptionsBuilder WithDisconnectedInterceptor(IMqttServerClientDisconnectedHandler value)
+        {
+            _options.ClientDisconnectedInterceptor = value;
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithDisconnectedInterceptor(Action<MqttServerClientDisconnectedEventArgs> value)
+        {
+            _options.ClientDisconnectedInterceptor = new MqttServerClientDisconnectedHandlerDelegate(value);
+            return this;
+        }
+
         public MqttServerOptionsBuilder WithApplicationMessageInterceptor(IMqttServerApplicationMessageInterceptor value)
         {
             _options.ApplicationMessageInterceptor = value;
@@ -172,6 +186,36 @@ namespace MQTTnet.Server
         public MqttServerOptionsBuilder WithApplicationMessageInterceptor(Action<MqttApplicationMessageInterceptorContext> value)
         {
             _options.ApplicationMessageInterceptor = new MqttServerApplicationMessageInterceptorDelegate(value);
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithApplicationMessageInterceptor(Func<MqttApplicationMessageInterceptorContext, Task> value)
+        {
+            _options.ApplicationMessageInterceptor = new MqttServerApplicationMessageInterceptorDelegate(value);
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithMultiThreadedApplicationMessageInterceptor(Action<MqttApplicationMessageInterceptorContext> value)
+        {
+            _options.ApplicationMessageInterceptor = new MqttServerMultiThreadedApplicationMessageInterceptorDelegate(value);
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithMultiThreadedApplicationMessageInterceptor(Func<MqttApplicationMessageInterceptorContext, Task> value)
+        {
+            _options.ApplicationMessageInterceptor = new MqttServerMultiThreadedApplicationMessageInterceptorDelegate(value);
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithClientMessageQueueInterceptor(IMqttServerClientMessageQueueInterceptor value)
+        {
+            _options.ClientMessageQueueInterceptor = value;
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithClientMessageQueueInterceptor(Action<MqttClientMessageQueueInterceptorContext> value)
+        {
+            _options.ClientMessageQueueInterceptor = new MqttClientMessageQueueInterceptorDelegate(value);
             return this;
         }
 
@@ -193,6 +237,24 @@ namespace MQTTnet.Server
             return this;
         }
 
+        public MqttServerOptionsBuilder WithUndeliveredMessageInterceptor(Action<MqttApplicationMessageInterceptorContext> value)
+        {
+            _options.UndeliveredMessageInterceptor = new MqttServerApplicationMessageInterceptorDelegate(value);
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithDefaultEndpointReuseAddress()
+        {
+            _options.DefaultEndpointOptions.ReuseAddress = true;
+            return this;
+        }
+
+        public MqttServerOptionsBuilder WithTlsEndpointReuseAddress()
+        {
+            _options.TlsEndpointOptions.ReuseAddress = true;
+            return this;
+        }
+
         public MqttServerOptionsBuilder WithPersistentSessions()
         {
             _options.EnablePersistentSessions = true;
@@ -211,12 +273,6 @@ namespace MQTTnet.Server
         public IMqttServerOptions Build()
         {
             return _options;
-        }
-
-        public MqttServerOptionsBuilder WithUndeliveredMessageInterceptor(Action<MqttApplicationMessageInterceptorContext> value)
-        {
-            _options.UndeliveredMessageInterceptor = new MqttServerApplicationMessageInterceptorDelegate(value);
-            return this;
         }
     }
 }

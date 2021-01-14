@@ -1,7 +1,6 @@
 ﻿#if !WINDOWS_UWP
 using MQTTnet.Adapter;
 using MQTTnet.Diagnostics;
-using MQTTnet.Internal;
 using MQTTnet.Server;
 using System;
 using System.Collections.Generic;
@@ -13,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace MQTTnet.Implementations
 {
-    public sealed class MqttTcpServerAdapter : Disposable, IMqttServerAdapter
+    public sealed class MqttTcpServerAdapter : IMqttServerAdapter
     {
         readonly List<MqttTcpServerListener> _listeners = new List<MqttTcpServerListener>();
         readonly IMqttNetScopedLogger _logger;
@@ -48,7 +47,7 @@ namespace MQTTnet.Implementations
                 {
                     throw new ArgumentException("TLS certificate is not set.");
                 }
-                
+
                 var tlsCertificate = options.TlsEndpointOptions.CertificateProvider.GetCertificate();
                 if (!tlsCertificate.HasPrivateKey)
                 {
@@ -67,28 +66,29 @@ namespace MQTTnet.Implementations
             return PlatformAbstractionLayer.CompletedTask;
         }
 
-        protected override void Dispose(bool disposing)
+        public void Dispose()
         {
-            if (disposing)
-            {
-                Cleanup();
-            }
-
-            base.Dispose(disposing);
+            Cleanup();
         }
 
         void Cleanup()
         {
-            _cancellationTokenSource?.Cancel(false);
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
-
-            foreach (var listener in _listeners)
+            try
             {
-                listener.Dispose();
+                _cancellationTokenSource?.Cancel(false);
             }
+            finally
+            {
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = null;
 
-            _listeners.Clear();
+                foreach (var listener in _listeners)
+                {
+                    listener.Dispose();
+                }
+
+                _listeners.Clear();
+            }
         }
 
         void RegisterListeners(MqttServerTcpEndpointBaseOptions options, X509Certificate2 tlsCertificate, CancellationToken cancellationToken)
