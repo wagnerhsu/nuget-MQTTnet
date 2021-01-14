@@ -49,9 +49,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MqttExamples.Host.Shared", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MqttExamples.Web.Unified", "host\MqttExamples.Web.Unified\MqttExamples.Web.Unified.csproj", "{3D872C41-E226-45C8-89C1-9D3DBD7C73F2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttExamples.Blazor", "src\MqttExamples.Blazor\MqttExamples.Blazor.csproj", "{827FCC18-A22B-4175-82CD-1233F6DEE8FB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MqttExamples.Blazor", "src\MqttExamples.Blazor\MqttExamples.Blazor.csproj", "{827FCC18-A22B-4175-82CD-1233F6DEE8FB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttExamples.Blazor.Host", "host\MqttExamples.Blazor.Host\MqttExamples.Blazor.Host.csproj", "{D7E0F672-F5E2-4338-AFF4-4E5091C55A62}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MqttExamples.Blazor.Host", "host\MqttExamples.Blazor.Host\MqttExamples.Blazor.Host.csproj", "{D7E0F672-F5E2-4338-AFF4-4E5091C55A62}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MqttExamples.SubscribeConsole", "host\MqttExamples.SubscribeConsole\MqttExamples.SubscribeConsole.csproj", "{15D2F613-8676-488D-BFF6-AFB6187FCA94}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MqttExamples.PublishConsole", "host\MqttExamples.PublishConsole\MqttExamples.PublishConsole.csproj", "{9568E92E-54F7-497D-8632-497FF354571E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -147,6 +151,14 @@ Global
 		{D7E0F672-F5E2-4338-AFF4-4E5091C55A62}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D7E0F672-F5E2-4338-AFF4-4E5091C55A62}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D7E0F672-F5E2-4338-AFF4-4E5091C55A62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15D2F613-8676-488D-BFF6-AFB6187FCA94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15D2F613-8676-488D-BFF6-AFB6187FCA94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15D2F613-8676-488D-BFF6-AFB6187FCA94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15D2F613-8676-488D-BFF6-AFB6187FCA94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9568E92E-54F7-497D-8632-497FF354571E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9568E92E-54F7-497D-8632-497FF354571E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9568E92E-54F7-497D-8632-497FF354571E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9568E92E-54F7-497D-8632-497FF354571E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -174,6 +186,8 @@ Global
 		{3D872C41-E226-45C8-89C1-9D3DBD7C73F2} = {E400416D-2895-4512-9D17-90681EEC7E0A}
 		{827FCC18-A22B-4175-82CD-1233F6DEE8FB} = {649A3FFA-182F-4E56-9717-E6A9A2BEC545}
 		{D7E0F672-F5E2-4338-AFF4-4E5091C55A62} = {E400416D-2895-4512-9D17-90681EEC7E0A}
+		{15D2F613-8676-488D-BFF6-AFB6187FCA94} = {E400416D-2895-4512-9D17-90681EEC7E0A}
+		{9568E92E-54F7-497D-8632-497FF354571E} = {E400416D-2895-4512-9D17-90681EEC7E0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4324B3B4-B60B-4E3C-91D8-59576B4E26DD}

@@ -1,0 +1,721 @@
+2021-01-14 15:51:51.798 +08:00 [INF] Starting console host.
+2021-01-14 15:51:53.888 +08:00 [INF] Loaded ABP modules:
+2021-01-14 15:51:53.890 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 15:51:53.890 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 15:51:53.890 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 15:51:53.891 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 15:51:53.907 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 15:51:53.910 +08:00 [INF] Hosting environment: Production
+2021-01-14 15:51:53.910 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 15:54:25.675 +08:00 [INF] Starting console host.
+2021-01-14 15:54:26.159 +08:00 [INF] Loaded ABP modules:
+2021-01-14 15:54:26.160 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 15:54:26.160 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 15:54:26.160 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 15:54:26.161 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 15:54:26.175 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 15:54:26.178 +08:00 [INF] Hosting environment: Production
+2021-01-14 15:54:26.178 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 15:54:37.240 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:40.236 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:43.258 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:46.276 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:49.281 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:52.288 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:55.303 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:54:58.313 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:55:01.322 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:55:04.316 +08:00 [DBG] O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.PublishConsole\Data\VitalSign.json
+2021-01-14 15:55:44.786 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:55:47.800 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:55:50.799 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:55:53.813 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:55:56.818 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:55:59.815 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:02.839 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:05.841 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:08.842 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:11.843 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:14.885 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:17.891 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:20.904 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:23.928 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:26.953 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:29.966 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:32.980 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:35.986 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:38.995 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:41.993 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:45.010 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:48.006 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 15:56:48.533 +08:00 [INF] Application is shutting down...
+2021-01-14 16:15:00.166 +08:00 [INF] Starting console host.
+2021-01-14 16:15:00.521 +08:00 [INF] Loaded ABP modules:
+2021-01-14 16:15:00.522 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 16:15:00.522 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 16:15:00.522 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 16:15:00.523 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 16:15:00.538 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 16:15:00.540 +08:00 [INF] Hosting environment: Production
+2021-01-14 16:15:00.541 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 16:15:22.637 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:15:25.527 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:17:46.779 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:17:49.784 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:17:52.805 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:17:55.823 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:17:58.823 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:01.832 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:04.852 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:07.865 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:10.877 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:13.882 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:16.903 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:19.904 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:22.937 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:25.947 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:28.992 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:31.981 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:34.994 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:38.016 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:41.030 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:44.059 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:47.057 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:50.062 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:53.063 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:18:56.073 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:28.764 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:31.689 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:34.704 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:37.711 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:40.717 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:43.733 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:46.740 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:49.750 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:52.760 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:55.778 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:27:58.792 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:01.800 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:04.810 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:07.824 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:10.832 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:13.833 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:16.858 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:19.863 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:22.875 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:25.893 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:28.884 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:31.876 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:34.904 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:28:37.912 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:07.807 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:10.720 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:13.732 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:16.735 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:19.772 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:22.780 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:25.775 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:28.813 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:31.822 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:30:34.838 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:01.096 +08:00 [INF] Starting console host.
+2021-01-14 16:32:01.476 +08:00 [INF] Loaded ABP modules:
+2021-01-14 16:32:01.477 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 16:32:01.477 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 16:32:01.478 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 16:32:01.478 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 16:32:01.492 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 16:32:01.494 +08:00 [INF] Hosting environment: Production
+2021-01-14 16:32:01.494 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 16:32:11.568 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:14.465 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:17.479 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:20.490 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:23.498 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:26.505 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:29.530 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:32.547 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:35.563 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:32:38.574 +08:00 [DBG] {
+  "DeviceCode": "123456",
+  "ItemNo": "Sys",
+  "ItemValue": "122",
+  "ItemUnit": null,
+  "DateTime": "2021-01-12T07:26:09.922Z"
+}
+2021-01-14 16:36:55.931 +08:00 [INF] Starting console host.
+2021-01-14 16:36:56.375 +08:00 [INF] Loaded ABP modules:
+2021-01-14 16:36:56.376 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 16:36:56.376 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 16:36:56.377 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 16:36:56.377 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 16:36:56.392 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 16:36:56.396 +08:00 [INF] Hosting environment: Production
+2021-01-14 16:36:56.396 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 16:37:08.783 +08:00 [INF] Starting console host.
+2021-01-14 16:37:09.285 +08:00 [INF] Loaded ABP modules:
+2021-01-14 16:37:09.287 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 16:37:09.287 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 16:37:09.287 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 16:37:09.288 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 16:37:09.306 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 16:37:09.309 +08:00 [INF] Hosting environment: Production
+2021-01-14 16:37:09.309 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 16:37:24.242 +08:00 [INF] Application is shutting down...
+2021-01-14 16:38:25.310 +08:00 [INF] Starting console host.
+2021-01-14 16:38:25.756 +08:00 [INF] Loaded ABP modules:
+2021-01-14 16:38:25.757 +08:00 [INF] - Volo.Abp.Castle.AbpCastleCoreModule
+2021-01-14 16:38:25.757 +08:00 [INF] - Volo.Abp.Autofac.AbpAutofacModule
+2021-01-14 16:38:25.757 +08:00 [INF] - MqttExamples.SubscribeConsole.SubscribeConsoleModule
+2021-01-14 16:38:25.758 +08:00 [INF] Initialized all ABP modules.
+2021-01-14 16:38:25.773 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2021-01-14 16:38:25.776 +08:00 [INF] Hosting environment: Production
+2021-01-14 16:38:25.776 +08:00 [INF] Content root path: O:\WagnerGitHub\nuget\nuget-MQTTnet\Examples\host\MqttExamples.SubscribeConsole
+2021-01-14 16:38:28.052 +08:00 [INF] Application is shutting down...
+2021-01-14 16:38:28.087 +08:00 [INF] SubscribeService.Dispose

@@ -8,6 +8,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Remove="Logs\**" />
+      <EmbeddedResource Remove="Logs\**" />
+      <None Remove="Logs\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MQTTnet" Version="3.0.13" />
+        <PackageReference Include="MQTTnet.Extensions.ManagedClient" Version="3.0.13" />
         <PackageReference Include="Volo.Abp.Autofac" Version="4.1.1" />
     </ItemGroup>
 
@@ -20,10 +28,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="appsettings.json">
-            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
+      <None Update="appsettings.json">
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Data\VitalSign.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

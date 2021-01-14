@@ -10,25 +10,25 @@ namespace MqttExamples.SubscribeConsole
     {
         private readonly IAbpApplicationWithExternalServiceProvider _application;
         private readonly IServiceProvider _serviceProvider;
-        private readonly HelloWorldService _helloWorldService;
+        private readonly SubscribeService _subscribeService;
 
         public SubscribeConsoleHostedService(
             IAbpApplicationWithExternalServiceProvider application,
             IServiceProvider serviceProvider,
-            HelloWorldService helloWorldService)
+            SubscribeService subscribeService)
         {
             _application = application;
             _serviceProvider = serviceProvider;
-            _helloWorldService = helloWorldService;
+            _subscribeService = subscribeService;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             _application.Initialize(_serviceProvider);
 
-            _helloWorldService.SayHello();
+            await _subscribeService.RunAsync();
 
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
