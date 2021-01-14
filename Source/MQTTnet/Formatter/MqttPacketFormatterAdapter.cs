@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using MQTTnet.Adapter;
 using MQTTnet.Exceptions;
 using MQTTnet.Formatter.V3;
@@ -7,14 +8,9 @@ using MQTTnet.Packets;
 
 namespace MQTTnet.Formatter
 {
-    public class MqttPacketFormatterAdapter
+    public sealed class MqttPacketFormatterAdapter
     {
-        private IMqttPacketFormatter _formatter;
-
-        public MqttPacketFormatterAdapter()
-            : this(new MqttPacketWriter())
-        {
-        }
+        IMqttPacketFormatter _formatter;
                
         public MqttPacketFormatterAdapter(MqttProtocolVersion protocolVersion)
             : this(protocolVersion, new MqttPacketWriter())
@@ -81,17 +77,6 @@ namespace MQTTnet.Formatter
             UseProtocolVersion(protocolVersion);
         }
 
-        private void UseProtocolVersion(MqttProtocolVersion protocolVersion)
-        {
-            if (protocolVersion == MqttProtocolVersion.Unknown)
-            {
-                throw new InvalidOperationException("MQTT protocol version is invalid.");
-            }
-
-            ProtocolVersion = protocolVersion;
-            _formatter = GetMqttPacketFormatter(protocolVersion, Writer);
-        }
-
         public static IMqttPacketFormatter GetMqttPacketFormatter(MqttProtocolVersion protocolVersion, IMqttPacketWriter writer)
         {
             if (protocolVersion == MqttProtocolVersion.Unknown)
@@ -120,9 +105,28 @@ namespace MQTTnet.Formatter
             }
         }
 
-        private MqttProtocolVersion ParseProtocolVersion(ReceivedMqttPacket receivedMqttPacket)
+        void UseProtocolVersion(MqttProtocolVersion protocolVersion)
+        {
+            if (protocolVersion == MqttProtocolVersion.Unknown)
+            {
+                throw new InvalidOperationException("MQTT protocol version is invalid.");
+            }
+
+            ProtocolVersion = protocolVersion;
+            _formatter = GetMqttPacketFormatter(protocolVersion, Writer);
+        }
+
+        static MqttProtocolVersion ParseProtocolVersion(ReceivedMqttPacket receivedMqttPacket)
         {
             if (receivedMqttPacket == null) throw new ArgumentNullException(nameof(receivedMqttPacket));
+
+            if (receivedMqttPacket.Body.Length < 7)
+            {
+                // 2 byte protocol name length
+                // at least 4 byte protocol name
+                // 1 byte protocol level
+                throw new MqttProtocolViolationException("CONNECT packet must have at least 7 bytes.");
+            }
 
             var protocolName = receivedMqttPacket.Body.ReadStringWithLengthPrefix();
             var protocolLevel = receivedMqttPacket.Body.ReadByte();
@@ -155,7 +159,8 @@ namespace MQTTnet.Formatter
             throw new MqttProtocolViolationException($"Protocol '{protocolName}' not supported.");
         }
 
-        private void ThrowIfFormatterNotSet()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void ThrowIfFormatterNotSet()
         {
             if (_formatter == null)
             {

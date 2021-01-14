@@ -18,6 +18,8 @@ namespace MQTTnet.Server
 
         public TimeSpan DefaultCommunicationTimeout { get; set; } = TimeSpan.FromSeconds(15);
 
+        public TimeSpan KeepAliveMonitorInterval { get; set; } = TimeSpan.FromMilliseconds(500);
+
         public IMqttServerConnectionValidator ConnectionValidator { get; set; }
 
         public IMqttServerApplicationMessageInterceptor ApplicationMessageInterceptor { get; set; }
@@ -31,5 +33,9 @@ namespace MQTTnet.Server
         public IMqttServerStorage Storage { get; set; }
 
         public IMqttRetainedMessagesManager RetainedMessagesManager { get; set; } = new MqttRetainedMessagesManager();
+
+        public IMqttServerApplicationMessageInterceptor UndeliveredMessageInterceptor { get; set; }
+
+        public IMqttServerClientDisconnectedHandler ClientDisconnectedInterceptor { get; set; }
     }
 }

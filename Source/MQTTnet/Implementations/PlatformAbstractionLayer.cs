@@ -1,105 +1,27 @@
 ﻿using System;
-using System.Net;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace MQTTnet.Implementations
 {
     public static class PlatformAbstractionLayer
     {
-        // TODO: Consider creating primitives like "MqttNetSocket" which will wrap all required methods and do the platform stuff.
-        public static async Task<Socket> AcceptAsync(Socket socket)
-        {
-#if NET452 || NET461
-            try
-            {
-                return await Task.Factory.FromAsync(socket.BeginAccept, socket.EndAccept, null).ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-                return null;
-            }
+#if NET452
+        public static Task CompletedTask => Task.FromResult(0);
+
+        public static byte[] EmptyByteArray { get; } = new byte[0];
 #else
-            return await socket.AcceptAsync().ConfigureAwait(false);
+        public static Task CompletedTask => Task.CompletedTask;
+
+        public static byte[] EmptyByteArray { get; } = Array.Empty<byte>();
 #endif
-        }
 
-
-        public static Task ConnectAsync(Socket socket, IPAddress ip, int port)
+        public static void Sleep(TimeSpan timeout)
         {
-#if NET452 || NET461
-            return Task.Factory.FromAsync(socket.BeginConnect, socket.EndConnect, ip, port, null);
+#if NET452 || NETSTANDARD2_0 || NETSTANDARD2_1 || NETCOREAPP3_1
+            System.Threading.Thread.Sleep(timeout);
 #else
-            return socket.ConnectAsync(ip, port);
+            Task.Delay(timeout).Wait();
 #endif
         }
-
-        public static Task ConnectAsync(Socket socket, string host, int port)
-        {
-#if NET452 || NET461
-            return Task.Factory.FromAsync(socket.BeginConnect, socket.EndConnect, host, port, null);
-#else
-            return socket.ConnectAsync(host, port);
-#endif
-        }
-
-#if NET452 || NET461
-        public class SocketWrapper 
-        {
-            private readonly Socket _socket;
-            private readonly ArraySegment<byte> _buffer;
-            private readonly SocketFlags _socketFlags;
-
-            public SocketWrapper(Socket socket, ArraySegment<byte> buffer, SocketFlags socketFlags)
-            {
-                _socket = socket;
-                _buffer = buffer;
-                _socketFlags = socketFlags;
-            }
-
-            public static IAsyncResult BeginSend(AsyncCallback callback, object state)
-            {
-                var real = (SocketWrapper)state;
-                return real._socket.BeginSend(real._buffer.Array, real._buffer.Offset, real._buffer.Count, real._socketFlags, callback, state);
-            }
-
-            public static IAsyncResult BeginReceive(AsyncCallback callback, object state)
-            {
-                var real = (SocketWrapper)state;
-                return real._socket.BeginReceive(real._buffer.Array, real._buffer.Offset, real._buffer.Count, real._socketFlags, callback, state);
-            }
-        }
-#endif
-
-        public static Task SendAsync(Socket socket, ArraySegment<byte> buffer, SocketFlags socketFlags)
-        {
-#if NET452 || NET461            
-            return Task.Factory.FromAsync(SocketWrapper.BeginSend, socket.EndSend, new SocketWrapper(socket, buffer, socketFlags));
-#else
-            return socket.SendAsync(buffer, socketFlags);
-#endif
-        }
-
-        public static Task<int> ReceiveAsync(Socket socket, ArraySegment<byte> buffer, SocketFlags socketFlags)
-        {
-#if NET452 || NET461
-            return Task.Factory.FromAsync(SocketWrapper.BeginReceive, socket.EndReceive, new SocketWrapper(socket, buffer, socketFlags));
-#else
-            return socket.ReceiveAsync(buffer, socketFlags);
-#endif
-        }
-
-        public static Task CompletedTask
-        {
-            get
-            {
-#if NET452 
-                return Task.FromResult(0);
-#else
-                return Task.CompletedTask;
-#endif
-            }
-        }
-
     }
 }

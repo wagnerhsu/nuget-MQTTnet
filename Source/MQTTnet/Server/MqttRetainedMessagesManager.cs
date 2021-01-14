@@ -1,26 +1,28 @@
-﻿using System;
+﻿using MQTTnet.Diagnostics;
+using MQTTnet.Implementations;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using MQTTnet.Diagnostics;
-using MQTTnet.Implementations;
 using MQTTnet.Internal;
 
 namespace MQTTnet.Server
 {
-    public class MqttRetainedMessagesManager : IMqttRetainedMessagesManager
+    public sealed class MqttRetainedMessagesManager : IMqttRetainedMessagesManager
     {
-        private readonly byte[] _emptyArray = new byte[0];
-        private readonly AsyncLock _messagesLock = new AsyncLock();
-        private readonly Dictionary<string, MqttApplicationMessage> _messages = new Dictionary<string, MqttApplicationMessage>();
+        readonly AsyncLock _storageAccessLock = new AsyncLock();
+        readonly Dictionary<string, MqttApplicationMessage> _messages = new Dictionary<string, MqttApplicationMessage>();
 
-        private IMqttNetChildLogger _logger;
-        private IMqttServerOptions _options;
+        IMqttNetScopedLogger _logger;
+        IMqttServerOptions _options;
 
-        public Task Start(IMqttServerOptions options, IMqttNetChildLogger logger)
+        // TODO: Get rid of the logger here!
+        public Task Start(IMqttServerOptions options, IMqttNetLogger logger)
         {
             if (logger == null) throw new ArgumentNullException(nameof(logger));
-            _logger = logger.CreateChildLogger(nameof(MqttRetainedMessagesManager));
+            _logger = logger.CreateScopedLogger(nameof(MqttRetainedMessagesManager));
+
             _options = options ?? throw new ArgumentNullException(nameof(options));
             return PlatformAbstractionLayer.CompletedTask;
         }
@@ -35,12 +37,13 @@ namespace MQTTnet.Server
             try
             {
                 var retainedMessages = await _options.Storage.LoadRetainedMessagesAsync().ConfigureAwait(false);
-                if (retainedMessages?.Any() == true)
-                {
-                    using (await _messagesLock.WaitAsync().ConfigureAwait(false))
-                    {
-                        _messages.Clear();
 
+                lock (_messages)
+                {
+                    _messages.Clear();
+
+                    if (retainedMessages != null)
+                    {
                         foreach (var retainedMessage in retainedMessages)
                         {
                             _messages[retainedMessage.Topic] = retainedMessage;
@@ -60,9 +63,11 @@ namespace MQTTnet.Server
 
             try
             {
-                using (await _messagesLock.WaitAsync().ConfigureAwait(false))
+                List<MqttApplicationMessage> messagesForSave = null;
+                var saveIsRequired = false;
+                
+                lock (_messages)
                 {
-                    var saveIsRequired = false;
                     var hasPayload = applicationMessage.Payload != null && applicationMessage.Payload.Length > 0;
 
                     if (!hasPayload)
@@ -79,7 +84,7 @@ namespace MQTTnet.Server
                         }
                         else
                         {
-                            if (existingMessage.QualityOfServiceLevel != applicationMessage.QualityOfServiceLevel || !existingMessage.Payload.SequenceEqual(applicationMessage.Payload ?? _emptyArray))
+                            if (existingMessage.QualityOfServiceLevel != applicationMessage.QualityOfServiceLevel || !existingMessage.Payload.SequenceEqual(applicationMessage.Payload ?? PlatformAbstractionLayer.EmptyByteArray))
                             {
                                 _messages[applicationMessage.Topic] = applicationMessage;
                                 saveIsRequired = true;
@@ -91,9 +96,16 @@ namespace MQTTnet.Server
 
                     if (saveIsRequired)
                     {
-                        if (_options.Storage != null)
+                        messagesForSave = new List<MqttApplicationMessage>(_messages.Values);
+                    }
+                }
+
+                if (saveIsRequired)
+                {
+                    if (_options.Storage != null)
+                    {
+                        using (await _storageAccessLock.WaitAsync(CancellationToken.None).ConfigureAwait(false))
                         {
-                            var messagesForSave = new List<MqttApplicationMessage>(_messages.Values);
                             await _options.Storage.SaveRetainedMessagesAsync(messagesForSave).ConfigureAwait(false);
                         }
                     }
@@ -105,14 +117,14 @@ namespace MQTTnet.Server
             }
         }
 
-        public async Task<IList<MqttApplicationMessage>> GetSubscribedMessagesAsync(ICollection<TopicFilter> topicFilters)
+        public Task<IList<MqttApplicationMessage>> GetSubscribedMessagesAsync(ICollection<MqttTopicFilter> topicFilters)
         {
             if (topicFilters == null) throw new ArgumentNullException(nameof(topicFilters));
 
             var matchingRetainedMessages = new List<MqttApplicationMessage>();
 
             List<MqttApplicationMessage> retainedMessages;
-            using (await _messagesLock.WaitAsync().ConfigureAwait(false))
+            lock (_messages)
             {
                 retainedMessages = _messages.Values.ToList();
             }
@@ -131,24 +143,27 @@ namespace MQTTnet.Server
                 }
             }
 
-            return matchingRetainedMessages;
+            return Task.FromResult((IList<MqttApplicationMessage>)matchingRetainedMessages);
         }
 
-        public async Task<IList<MqttApplicationMessage>> GetMessagesAsync()
+        public Task<IList<MqttApplicationMessage>> GetMessagesAsync()
         {
-            using (await _messagesLock.WaitAsync().ConfigureAwait(false))
+            lock (_messages)
             {
-                return _messages.Values.ToList();
+                return Task.FromResult((IList<MqttApplicationMessage>)_messages.Values.ToList());
             }
         }
 
         public async Task ClearMessagesAsync()
         {
-            using (await _messagesLock.WaitAsync().ConfigureAwait(false))
+            lock (_messages)
             {
                 _messages.Clear();
+            }
 
-                if (_options.Storage != null)
+            if (_options.Storage != null)
+            {
+                using (await _storageAccessLock.WaitAsync(CancellationToken.None).ConfigureAwait(false))
                 {
                     await _options.Storage.SaveRetainedMessagesAsync(new List<MqttApplicationMessage>()).ConfigureAwait(false);
                 }

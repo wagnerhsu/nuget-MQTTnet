@@ -1,21 +1,21 @@
-﻿using System;
+﻿using MQTTnet.Channel;
+using MQTTnet.Client.Options;
+using MQTTnet.Internal;
+using System;
 using System.Net;
 using System.Net.WebSockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using MQTTnet.Channel;
-using MQTTnet.Client.Options;
-using MQTTnet.Internal;
 
 namespace MQTTnet.Implementations
 {
-    public class MqttWebSocketChannel : Disposable, IMqttChannel
+    public sealed class MqttWebSocketChannel : IMqttChannel
     {
-        private readonly MqttClientWebSocketOptions _options;
+        readonly MqttClientWebSocketOptions _options;
 
-        private SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
-        private WebSocket _webSocket;
+        AsyncLock _sendLock = new AsyncLock();
+        WebSocket _webSocket;
 
         public MqttWebSocketChannel(MqttClientWebSocketOptions options)
         {
@@ -35,7 +35,7 @@ namespace MQTTnet.Implementations
 
         public bool IsSecureConnection { get; private set; }
 
-        public X509Certificate2 ClientCertificate { get; private set; }
+        public X509Certificate2 ClientCertificate { get; }
 
         public async Task ConnectAsync(CancellationToken cancellationToken)
         {
@@ -53,6 +53,67 @@ namespace MQTTnet.Implementations
             }
 
             var clientWebSocket = new ClientWebSocket();
+            try
+            {
+                SetupClientWebSocket(clientWebSocket);
+
+                await clientWebSocket.ConnectAsync(new Uri(uri), cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Prevent a memory leak when always creating new instance which will fail while connecting.
+                clientWebSocket.Dispose();
+                throw;
+            }
+
+            _webSocket = clientWebSocket;
+            IsSecureConnection = uri.StartsWith("wss://", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public async Task DisconnectAsync(CancellationToken cancellationToken)
+        {
+            if (_webSocket == null)
+            {
+                return;
+            }
+
+            if (_webSocket.State == WebSocketState.Open || _webSocket.State == WebSocketState.Connecting)
+            {
+                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, cancellationToken).ConfigureAwait(false);
+            }
+
+            Cleanup();
+        }
+
+        public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var response = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, offset, count), cancellationToken).ConfigureAwait(false);
+            return response.Count;
+        }
+
+        public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            // The lock is required because the client will throw an exception if _SendAsync_ is 
+            // called from multiple threads at the same time. But this issue only happens with several
+            // framework versions.
+            if (_sendLock == null)
+            {
+                return;
+            }
+
+            using (await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false))
+            {
+                await _webSocket.SendAsync(new ArraySegment<byte>(buffer, offset, count), WebSocketMessageType.Binary, true, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        public void Dispose()
+        {
+            Cleanup();
+        }
+
+        void SetupClientWebSocket(ClientWebSocket clientWebSocket)
+        {
 
             if (_options.ProxyOptions != null)
             {
@@ -90,68 +151,42 @@ namespace MQTTnet.Implementations
 #else
                     clientWebSocket.Options.ClientCertificates.Add(certificate);
 #endif
-                    
+
                 }
             }
 
-            await clientWebSocket.ConnectAsync(new Uri(uri), cancellationToken).ConfigureAwait(false);
-            _webSocket = clientWebSocket;
-
-            IsSecureConnection = uri.StartsWith("wss://", StringComparison.OrdinalIgnoreCase);
-        }
-
-        public async Task DisconnectAsync(CancellationToken cancellationToken)
-        {
-            if (_webSocket == null)
+            var certificateValidationHandler = _options.TlsOptions?.CertificateValidationHandler;
+            if (certificateValidationHandler != null)
             {
-                return;
-            }
+#if NETSTANDARD1_3
+                throw new NotSupportedException("Remote certificate validation callback is not supported when using 'netstandard1.3'.");
+#elif NETSTANDARD2_0
+                throw new NotSupportedException("Remote certificate validation callback is not supported when using 'netstandard2.0'.");
+#elif WINDOWS_UWP
+                throw new NotSupportedException("Remote certificate validation callback is not supported when using 'uap10.0'.");
+#elif NET452
+                throw new NotSupportedException("Remote certificate validation callback is not supported when using 'net452'.");
+#elif NET461
+                throw new NotSupportedException("Remote certificate validation callback is not supported when using 'net461'.");
+#else
+                clientWebSocket.Options.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) =>
+                {
+                    // TODO: Find a way to add client options to same callback. Problem is that they have a different type.
+                    var context = new MqttClientCertificateValidationCallbackContext
+                    {
+                        Certificate = certificate,
+                        Chain = chain,
+                        SslPolicyErrors = sslPolicyErrors,
+                        ClientOptions = _options
+                    };
 
-            if (_webSocket.State == WebSocketState.Open || _webSocket.State == WebSocketState.Connecting)
-            {
-                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, cancellationToken).ConfigureAwait(false);
-            }
-
-            Cleanup();
-        }
-
-        public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            var response = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, offset, count), cancellationToken).ConfigureAwait(false);
-            return response.Count;
-        }
-
-        public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            // The lock is required because the client will throw an exception if _SendAsync_ is 
-            // called from multiple threads at the same time. But this issue only happens with several
-            // framework versions.
-            if (_sendLock == null)
-            {
-                return;
-            }
-
-            await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                await _webSocket.SendAsync(new ArraySegment<byte>(buffer, offset, count), WebSocketMessageType.Binary, true, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                _sendLock?.Release();
+                    return certificateValidationHandler(context);
+                };
+#endif
             }
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                Cleanup();
-            }
-            base.Dispose(disposing);
-        }
-
-        private void Cleanup()
+        void Cleanup()
         {
             _sendLock?.Dispose();
             _sendLock = null;
@@ -169,7 +204,7 @@ namespace MQTTnet.Implementations
             }
         }
 
-        private IWebProxy CreateProxy()
+        IWebProxy CreateProxy()
         {
             if (string.IsNullOrEmpty(_options.ProxyOptions?.Address))
             {
@@ -177,9 +212,9 @@ namespace MQTTnet.Implementations
             }
 
 #if WINDOWS_UWP
-            throw new NotSupportedException("Proxies are not supported in UWP.");
+            throw new NotSupportedException("Proxies are not supported when using 'uap10.0'.");
 #elif NETSTANDARD1_3
-            throw new NotSupportedException("Proxies are not supported in netstandard 1.3.");
+            throw new NotSupportedException("Proxies are not supported when using 'netstandard 1.3'.");
 #else
             var proxyUri = new Uri(_options.ProxyOptions.Address);
 

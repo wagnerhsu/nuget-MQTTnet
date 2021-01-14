@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading;
-using System.Threading.Tasks;
-using MQTTnet.Client;
-using MQTTnet.Client.Options;
+﻿using MQTTnet.Client.Options;
 using MQTTnet.Diagnostics;
 using MQTTnet.Server;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Security;
+using System.Threading;
+using System.Threading.Tasks;
+using MQTTnet.Client;
 
 namespace MQTTnet.TestApp.NetCore
 {
@@ -17,7 +16,9 @@ namespace MQTTnet.TestApp.NetCore
     {
         public static void Main()
         {
-            Console.WriteLine($"MQTTnet - TestApp.{TargetFrameworkInfoProvider.TargetFramework}");
+            //MqttNetConsoleLogger.ForwardToConsole();
+
+            Console.WriteLine($"MQTTnet - TestApp.{TargetFrameworkProvider.TargetFramework}");
             Console.WriteLine("1 = Start client");
             Console.WriteLine("2 = Start server");
             Console.WriteLine("3 = Start performance test");
@@ -42,8 +43,7 @@ namespace MQTTnet.TestApp.NetCore
             }
             else if (pressedKey.KeyChar == '3')
             {
-                PerformanceTest.RunClientAndServer();
-                return;
+                Task.Run(PerformanceTest.RunClientAndServer);
             }
             else if (pressedKey.KeyChar == '4')
             {
@@ -86,11 +86,51 @@ namespace MQTTnet.TestApp.NetCore
 
             Thread.Sleep(Timeout.Infinite);
         }
-    }
 
+        static int _count;
+
+        static async Task ClientTestWithHandlers()
+        {
+            //private static int _count = 0;
+
+            var factory = new MqttFactory();
+            var mqttClient = factory.CreateMqttClient();
+
+            var options = new MqttClientOptionsBuilder()
+                .WithClientId("mqttnetspeed")
+                .WithTcpServer("#serveraddress#")
+                .WithCredentials("#username#", "#password#")
+                .WithCleanSession()
+                .Build();
+
+            //mqttClient.ApplicationMessageReceived += (s, e) =>    // version 2.8.5
+            mqttClient.UseApplicationMessageReceivedHandler(e =>    // version 3.0.0+
+            {
+                Interlocked.Increment(ref _count);
+            });
+
+            //mqttClient.Connected += async (s, e) =>               // version 2.8.5
+            mqttClient.UseConnectedHandler(async e =>               // version 3.0.0+
+            {
+                Console.WriteLine("### CONNECTED WITH SERVER ###");
+                await mqttClient.SubscribeAsync("topic/+", MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce);
+                Console.WriteLine("### SUBSCRIBED ###");
+            });
+
+            await mqttClient.ConnectAsync(options);
+
+            while (true)
+            {
+                Console.WriteLine($"{Interlocked.Exchange(ref _count, 0)}/s");
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
+
+        }
+    }
+    
     public class RetainedMessageHandler : IMqttServerStorage
     {
-        private const string Filename = "C:\\MQTT\\RetainedMessages.json";
+        const string Filename = "C:\\MQTT\\RetainedMessages.json";
 
         public Task SaveRetainedMessagesAsync(IList<MqttApplicationMessage> messages)
         {
@@ -129,10 +169,15 @@ namespace MQTTnet.TestApp.NetCore
             var options = new MqttClientOptionsBuilder()
                 .WithTls(new MqttClientOptionsBuilderTlsParameters
                 {
-                    CertificateValidationCallback = (X509Certificate x, X509Chain y, SslPolicyErrors z, IMqttClientOptions o) =>
+                    CertificateValidationHandler = context =>
                         {
-                            // TODO: Check conditions of certificate by using above parameters.
-                            return true;
+                            // TODO: Check conditions of certificate by using above context.
+                            if (context.SslPolicyErrors == SslPolicyErrors.None)
+                            {
+                                return true;
+                            }
+
+                            return false;
                         }
                 })
                 .Build();

@@ -8,16 +8,15 @@ namespace MQTTnet.AspNetCore
 {
     public class SpanBasedMqttPacketWriter : IMqttPacketWriter
     {
-        private readonly ArrayPool<byte> _pool;
+        readonly ArrayPool<byte> _pool = ArrayPool<byte>.Create();
 
         public SpanBasedMqttPacketWriter()
         {
-            _pool = ArrayPool<byte>.Create();
-            
+            Reset(0);
         }
 
-        private byte[] _buffer;
-        private int _position;
+        byte[] _buffer;
+        int _position;
 
         public int Length { get; set; }
 
@@ -112,7 +111,7 @@ namespace MQTTnet.AspNetCore
             Commit(payload.Length);
         }
 
-        private void Commit(int count)
+        void Commit(int count)
         {
             if (_position == Length)
             {
@@ -122,7 +121,7 @@ namespace MQTTnet.AspNetCore
             _position += count;
         }
 
-        private void GrowIfNeeded(int requiredAdditional) 
+        void GrowIfNeeded(int requiredAdditional) 
         {
             var requiredTotal = _position + requiredAdditional;
             if (_buffer.Length >= requiredTotal)

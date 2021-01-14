@@ -8,9 +8,9 @@ namespace MQTTnet.AspNetCore
 {
     public class SpanBasedMqttPacketBodyReader : IMqttPacketBodyReader
     {
-        private ReadOnlyMemory<byte> _buffer;
+        ReadOnlyMemory<byte> _buffer;
 
-        private int _offset;
+        int _offset;
         
         public void SetBuffer(ReadOnlyMemory<byte> buffer)
         {
@@ -37,16 +37,6 @@ namespace MQTTnet.AspNetCore
         public byte[] ReadWithLengthPrefix()
         {
             return ReadSegmentWithLengthPrefix().ToArray();
-        }
-
-        private ReadOnlySpan<byte> ReadSegmentWithLengthPrefix()
-        {
-            var span = _buffer.Span;
-            var length = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(_offset));
-
-            var result = span.Slice(_offset+2, length);
-            _offset += 2 + length;
-            return result;
         }
         
         public unsafe string ReadStringWithLengthPrefix()
@@ -120,6 +110,20 @@ namespace MQTTnet.AspNetCore
         public void Seek(int position)
         {
             _offset = position;
+        }
+
+        ReadOnlySpan<byte> ReadSegmentWithLengthPrefix()
+        {
+            var span = _buffer.Span;
+            var length = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(_offset));
+
+            if (Length < _offset + length)
+            {
+                throw new MqttProtocolViolationException($"Expected at least {_offset + 2 + length} bytes but there are only {Length} bytes");
+            }
+            var result = span.Slice(_offset + 2, length);
+            _offset += 2 + length;
+            return result;
         }
     }
 }

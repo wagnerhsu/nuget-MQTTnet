@@ -254,6 +254,10 @@ namespace MQTTnet.Formatter.V5
                 {
                     packet.Properties.ReceiveMaximum = propertiesReader.ReadReceiveMaximum();
                 }
+                else if (propertiesReader.CurrentPropertyId == MqttPropertyId.MaximumQoS)
+                {
+                    packet.Properties.MaximumQoS = propertiesReader.ReadMaximumQoS();
+                }
                 else if (propertiesReader.CurrentPropertyId == MqttPropertyId.AssignedClientIdentifier)
                 {
                     packet.Properties.AssignedClientIdentifier = propertiesReader.ReadAssignedClientIdentifier();
@@ -405,7 +409,7 @@ namespace MQTTnet.Formatter.V5
                 var retainAsPublished = (options & (1 << 3)) > 0;
                 var retainHandling = (MqttRetainHandling)((options >> 4) & 3);
 
-                packet.TopicFilters.Add(new TopicFilter
+                packet.TopicFilters.Add(new MqttTopicFilter
                 {
                     Topic = topic,
                     QualityOfServiceLevel = qos,

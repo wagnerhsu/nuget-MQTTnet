@@ -17,14 +17,14 @@ using MQTTnet.Server;
 
 namespace MQTTnet.Implementations
 {
-    public class MqttTcpChannel : IMqttChannel
+    public sealed class MqttTcpChannel : IMqttChannel
     {
-        private readonly MqttClientTcpOptions _options;
-        private readonly int _bufferSize;
+        readonly MqttClientTcpOptions _options;
+        readonly int _bufferSize;
 
-        private StreamSocket _socket;
-        private Stream _readStream;
-        private Stream _writeStream;
+        StreamSocket _socket;
+        Stream _readStream;
+        Stream _writeStream;
 
         public MqttTcpChannel(IMqttClientOptions clientOptions)
         {
@@ -64,7 +64,7 @@ namespace MQTTnet.Implementations
 
             if (_options.TlsOptions?.UseTls != true)
             {
-                await _socket.ConnectAsync(new HostName(_options.Server), _options.GetPort().ToString());
+                await _socket.ConnectAsync(new HostName(_options.Server), _options.GetPort().ToString()).AsTask().ConfigureAwait(false);
             }
             else
             {
@@ -75,17 +75,29 @@ namespace MQTTnet.Implementations
                     _socket.Control.IgnorableServerCertificateErrors.Add(ignorableChainValidationResult);
                 }
 
+#if NETCOREAPP3_1 || NET5_0
+                var socketProtectionLevel = SocketProtectionLevel.Tls13;
+                if (_options.TlsOptions.SslProtocol == SslProtocols.Tls12)
+                {
+                    socketProtectionLevel = SocketProtectionLevel.Tls12;
+                }
+                else if (_options.TlsOptions.SslProtocol == SslProtocols.Tls11)
+                {
+                    socketProtectionLevel = SocketProtectionLevel.Tls11;
+                }
+#else
                 var socketProtectionLevel = SocketProtectionLevel.Tls12;
                 if (_options.TlsOptions.SslProtocol == SslProtocols.Tls11)
                 {
                     socketProtectionLevel = SocketProtectionLevel.Tls11;
                 }
+#endif
                 else if (_options.TlsOptions.SslProtocol == SslProtocols.Tls)
                 {
                     socketProtectionLevel = SocketProtectionLevel.Tls10;
                 }
 
-                await _socket.ConnectAsync(new HostName(_options.Server), _options.GetPort().ToString(), socketProtectionLevel);
+                await _socket.ConnectAsync(new HostName(_options.Server), _options.GetPort().ToString(), socketProtectionLevel).AsTask().ConfigureAwait(false);
             }
 
             Endpoint = _socket.Information.RemoteAddress + ":" + _socket.Information.RemotePort;
@@ -129,7 +141,7 @@ namespace MQTTnet.Implementations
 
             if (options.TlsOptions.Certificates.Count > 1)
             {
-                throw new NotSupportedException("Only one client certificate is supported for UWP.");
+                throw new NotSupportedException("Only one client certificate is supported when using 'uap10.0'.");
             }
 
             return new Certificate(options.TlsOptions.Certificates.First().AsBuffer());

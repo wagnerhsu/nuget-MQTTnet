@@ -3,11 +3,11 @@ using System.Linq;
 
 namespace MQTTnet.Packets
 {
-    public class MqttSubscribePacket : MqttBasePacket, IMqttPacketWithIdentifier
+    public sealed class MqttSubscribePacket : MqttBasePacket, IMqttPacketWithIdentifier
     {
-        public ushort? PacketIdentifier { get; set; }
+        public ushort PacketIdentifier { get; set; }
 
-        public List<TopicFilter> TopicFilters { get; set; } = new List<TopicFilter>();
+        public List<MqttTopicFilter> TopicFilters { get; set; } = new List<MqttTopicFilter>();
 
         #region Added in MQTTv5
 

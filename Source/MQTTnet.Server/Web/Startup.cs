@@ -1,12 +1,12 @@
 ﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 using Microsoft.Scripting.Utils;
+using MQTTnet.AspNetCore;
 using MQTTnet.Server.Configuration;
 using MQTTnet.Server.Logging;
 using MQTTnet.Server.Mqtt;
@@ -36,33 +36,28 @@ namespace MQTTnet.Server.Web
 
         public void Configure(
             IApplicationBuilder application,
-            IHostingEnvironment environment,
             MqttServerService mqttServerService,
             PythonScriptHostService pythonScriptHostService,
             DataSharingService dataSharingService,
             MqttSettingsModel mqttSettings)
         {
-            if (environment.IsDevelopment())
-            {
-                application.UseDeveloperExceptionPage();
-            }
-            else
-            {
-                application.UseHsts();
-            }
+            application.UseDefaultFiles();
+            application.UseStaticFiles();
 
+            application.UseHsts();
+            application.UseRouting();
             application.UseCors(x => x
                 .AllowAnyOrigin()
                 .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials());
+                .AllowAnyHeader());
 
             application.UseAuthentication();
-
-            application.UseStaticFiles();
-
-            application.UseHttpsRedirection();
-            application.UseMvc();
+            application.UseAuthorization();
+     
+            application.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
 
             ConfigureWebSocketEndpoint(application, mqttServerService, mqttSettings);
 
@@ -88,6 +83,8 @@ namespace MQTTnet.Server.Web
         {
             services.AddCors();
 
+            services.AddControllers();
+
             services.AddMvc()
                 .SetCompatibilityVersion(CompatibilityVersion.Version_3_0)
                 .AddNewtonsoftJson(o =>
@@ -112,18 +109,22 @@ namespace MQTTnet.Server.Web
             services.AddSingleton<MqttClientUnsubscribedTopicHandler>();
             services.AddSingleton<MqttServerConnectionValidator>();
             services.AddSingleton<MqttSubscriptionInterceptor>();
+            services.AddSingleton<MqttUnsubscriptionInterceptor>();
             services.AddSingleton<MqttApplicationMessageInterceptor>();
 
             services.AddSwaggerGen(c =>
             {
-                c.DescribeAllEnumsAsStrings();
-
                 var securityScheme = new OpenApiSecurityScheme
                 {
-                    Scheme = "Basic",
+                    Scheme = "basic",
                     Name = HeaderNames.Authorization,
                     Type = SecuritySchemeType.Http,
-                    In = ParameterLocation.Header
+                    In = ParameterLocation.Header,
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Swagger"
+                    }
                 };
 
                 c.AddSecurityDefinition("Swagger", securityScheme);
@@ -157,7 +158,7 @@ namespace MQTTnet.Server.Web
                 .AddCookie();
         }
 
-        private void ReadMqttSettings(IServiceCollection services)
+        void ReadMqttSettings(IServiceCollection services)
         {
             var mqttSettings = new MqttSettingsModel();
             Configuration.Bind("MQTT", mqttSettings);
@@ -168,7 +169,7 @@ namespace MQTTnet.Server.Web
             services.AddSingleton(scriptingSettings);
         }
 
-        private static void ConfigureWebSocketEndpoint(
+        static void ConfigureWebSocketEndpoint(
             IApplicationBuilder application,
             MqttServerService mqttServerService,
             MqttSettingsModel mqttSettings)
@@ -185,8 +186,7 @@ namespace MQTTnet.Server.Web
 
             var webSocketOptions = new WebSocketOptions
             {
-                KeepAliveInterval = TimeSpan.FromSeconds(mqttSettings.WebSocketEndPoint.KeepAliveInterval),
-                ReceiveBufferSize = mqttSettings.WebSocketEndPoint.ReceiveBufferSize
+                KeepAliveInterval = TimeSpan.FromSeconds(mqttSettings.WebSocketEndPoint.KeepAliveInterval)
             };
 
             if (mqttSettings.WebSocketEndPoint.AllowedOrigins?.Any() == true)
@@ -202,7 +202,13 @@ namespace MQTTnet.Server.Web
                 {
                     if (context.WebSockets.IsWebSocketRequest)
                     {
-                        using (var webSocket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false))
+                        string subProtocol = null;
+                        if (context.Request.Headers.TryGetValue("Sec-WebSocket-Protocol", out var requestedSubProtocolValues))
+                        {
+                            subProtocol = MqttSubProtocolSelector.SelectSubProtocol(requestedSubProtocolValues);
+                        }
+
+                        using (var webSocket = await context.WebSockets.AcceptWebSocketAsync(subProtocol).ConfigureAwait(false))
                         {
                             await mqttServerService.RunWebSocketConnectionAsync(webSocket, context).ConfigureAwait(false);
                         }

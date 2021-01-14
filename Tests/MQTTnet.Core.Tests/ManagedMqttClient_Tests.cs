@@ -60,8 +60,6 @@ namespace MQTTnet.Tests
             {
                 var receivedMessagesCount = 0;
 
-                var factory = new MqttFactory();
-
                 await testEnvironment.StartServerAsync();
 
                 var willMessage = new MqttApplicationMessageBuilder().WithTopic("My/last/will").WithAtMostOnceQoS().Build();
@@ -69,7 +67,7 @@ namespace MQTTnet.Tests
                     .WithTcpServer("localhost", testEnvironment.ServerPort)
                     .WithWillMessage(willMessage);
                 var dyingClient = testEnvironment.CreateClient();
-                var dyingManagedClient = new ManagedMqttClient(dyingClient, testEnvironment.ClientLogger.CreateChildLogger());
+                var dyingManagedClient = new ManagedMqttClient(dyingClient, testEnvironment.ClientLogger);
                 await dyingManagedClient.StartAsync(new ManagedMqttClientOptionsBuilder()
                     .WithClientOptions(clientOptions)
                     .Build());
@@ -92,11 +90,9 @@ namespace MQTTnet.Tests
         {
             using (var testEnvironment = new TestEnvironment(TestContext))
             {
-                var factory = new MqttFactory();
-
                 var server = await testEnvironment.StartServerAsync();
 
-                var managedClient = new ManagedMqttClient(testEnvironment.CreateClient(), new MqttNetLogger().CreateChildLogger());
+                var managedClient = new ManagedMqttClient(testEnvironment.CreateClient(), new MqttNetLogger());
                 var clientOptions = new MqttClientOptionsBuilder()
                     .WithTcpServer("localhost", testEnvironment.ServerPort);
 
@@ -124,11 +120,9 @@ namespace MQTTnet.Tests
                 testEnvironment.IgnoreClientLogErrors = true;
                 testEnvironment.IgnoreServerLogErrors = true;
 
-                var factory = new MqttFactory();
+                await testEnvironment.StartServerAsync();
 
-                var server = await testEnvironment.StartServerAsync();
-
-                var managedClient = new ManagedMqttClient(testEnvironment.CreateClient(), new MqttNetLogger().CreateChildLogger());
+                var managedClient = new ManagedMqttClient(testEnvironment.CreateClient(), new MqttNetLogger());
                 var clientOptions = new MqttClientOptionsBuilder()
                     .WithTcpServer("localhost", testEnvironment.ServerPort);
                 var storage = new ManagedMqttClientTestStorage();
@@ -276,14 +270,17 @@ namespace MQTTnet.Tests
                 var connectionCheckInterval = TimeSpan.FromSeconds(10);
                 var managedClient = await CreateManagedClientAsync(testEnvironment, null, connectionCheckInterval);
                 var sendingClient = await testEnvironment.ConnectClientAsync();
+                 
                 await sendingClient.PublishAsync(new MqttApplicationMessage { Topic = "topic", Payload = new byte[] { 1 }, Retain = true });
-
-                await managedClient.SubscribeAsync("topic");
 
                 var subscribeTime = DateTime.UtcNow;
 
-                var messages = await SetupReceivingOfMessages(managedClient, 1);
+                var messagesTask = SetupReceivingOfMessages(managedClient, 1);
 
+                await managedClient.SubscribeAsync("topic");
+
+                var messages = await messagesTask;
+                
                 var elapsed = DateTime.UtcNow - subscribeTime;
                 Assert.IsTrue(elapsed < TimeSpan.FromSeconds(1), $"Subscriptions must be activated immediately, this one took {elapsed}");
                 Assert.AreEqual(messages.Single().Topic, "topic");
@@ -295,46 +292,130 @@ namespace MQTTnet.Tests
         {
             using (var testEnvironment = new TestEnvironment(TestContext))
             {
-                var managedClient = await CreateManagedClientAsync(testEnvironment);
+                await testEnvironment.StartServerAsync().ConfigureAwait(false);
 
-                var sendingClient = await testEnvironment.ConnectClientAsync();
+                var sendingClient = await testEnvironment.ConnectClientAsync().ConfigureAwait(false);
                 await sendingClient.PublishAsync(new MqttApplicationMessage
-                { Topic = "topic", Payload = new byte[] { 1 }, Retain = true });
+                {
+                    Topic = "topic",
+                    Payload = new byte[] { 1 },
+                    Retain = true
+                });
 
                 // Wait a bit for the retained message to be available
                 await Task.Delay(500);
 
-                await managedClient.SubscribeAsync("topic");
+                await sendingClient.DisconnectAsync();
 
-                await SetupReceivingOfMessages(managedClient, 1);
-
-                await managedClient.StopAsync();
+                // Now use the managed client and check if subscriptions get cleared properly.
 
                 var clientOptions = new MqttClientOptionsBuilder()
-                  .WithTcpServer("localhost", testEnvironment.ServerPort);
+                   .WithTcpServer("localhost", testEnvironment.ServerPort);
+
+                var receivedManagedMessages = new List<MqttApplicationMessage>();
+                var managedClient = new ManagedMqttClient(testEnvironment.CreateClient(), new MqttNetLogger());
+                managedClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(c =>
+                {
+                    receivedManagedMessages.Add(c.ApplicationMessage);
+                });
+
+                await managedClient.SubscribeAsync("topic");
+
                 await managedClient.StartAsync(new ManagedMqttClientOptionsBuilder()
                   .WithClientOptions(clientOptions)
                   .WithAutoReconnectDelay(TimeSpan.FromSeconds(1))
                   .Build());
 
-                var messages = new List<MqttApplicationMessage>();
-                managedClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(r =>
-                {
-                    messages.Add(r.ApplicationMessage);
-                });
+                await Task.Delay(500);
+
+                Assert.AreEqual(1, receivedManagedMessages.Count);
+
+                await managedClient.StopAsync();
 
                 await Task.Delay(500);
 
+                await managedClient.StartAsync(new ManagedMqttClientOptionsBuilder()
+                  .WithClientOptions(clientOptions)
+                  .WithAutoReconnectDelay(TimeSpan.FromSeconds(1))
+                  .Build());
+
+                await Task.Delay(1000);
+
                 // After reconnect and then some delay, the retained message must not be received,
                 // showing that the subscriptions were cleared
-                Assert.AreEqual(0, messages.Count);
+                Assert.AreEqual(1, receivedManagedMessages.Count);
+
+                // Make sure that it gets received after subscribing again.
+                await managedClient.SubscribeAsync("topic");
+                await Task.Delay(500);
+                Assert.AreEqual(2, receivedManagedMessages.Count);
             }
         }
 
-        private async Task<ManagedMqttClient> CreateManagedClientAsync(
-          TestEnvironment testEnvironment,
-          IMqttClient underlyingClient = null,
-          TimeSpan? connectionCheckInterval = null)
+        [TestMethod]
+        public async Task Manage_Session_MaxParallel_Subscribe()
+        {
+            using (var testEnvironment = new TestEnvironment())
+            {
+                testEnvironment.IgnoreClientLogErrors = true;
+
+                var serverOptions = new MqttServerOptionsBuilder();
+                await testEnvironment.StartServerAsync(serverOptions);
+
+                var options = new MqttClientOptionsBuilder().WithClientId("1").WithKeepAlivePeriod(TimeSpan.FromSeconds(5));
+                
+                var hasReceive = false;
+
+                void OnReceive()
+                {
+                    if (!hasReceive)
+                    {
+                        hasReceive = true;
+                    }
+                }
+
+                var clients = await Task.WhenAll(Enumerable.Range(0, 25)
+                    .Select(i => TryConnect_Subscribe(testEnvironment, options, OnReceive)));
+
+                var connectedClients = clients.Where(c => c?.IsConnected ?? false).ToList();
+
+                Assert.AreEqual(1, connectedClients.Count);
+
+                await Task.Delay(10000); // over 1.5T
+
+                var option2 = new MqttClientOptionsBuilder().WithClientId("2").WithKeepAlivePeriod(TimeSpan.FromSeconds(10));
+                var sendClient = await testEnvironment.ConnectClientAsync(option2);
+                await sendClient.PublishAsync("aaa", "1");
+                
+                await Task.Delay(3000);
+
+                Assert.AreEqual(true, hasReceive);
+            }
+        }
+
+        private async Task<IMqttClient> TryConnect_Subscribe(TestEnvironment testEnvironment, MqttClientOptionsBuilder options, Action onReceive)
+        {
+
+            try
+            {
+                var sendClient = await testEnvironment.ConnectClientAsync(options);
+                sendClient.ApplicationMessageReceivedHandler = new MQTTnet.Client.Receiving.MqttApplicationMessageReceivedHandlerDelegate(e =>
+                {
+                    onReceive();
+                });
+                await sendClient.SubscribeAsync("aaa");
+                return sendClient;
+            }
+            catch (System.Exception)
+            {
+                return null;
+            }
+        }
+
+        async Task<ManagedMqttClient> CreateManagedClientAsync(
+            TestEnvironment testEnvironment,
+            IMqttClient underlyingClient = null,
+            TimeSpan? connectionCheckInterval = null)
         {
             await testEnvironment.StartServerAsync();
 
@@ -350,8 +431,7 @@ namespace MQTTnet.Tests
             // at connection check intervals
             managedOptions.ConnectionCheckInterval = connectionCheckInterval ?? TimeSpan.FromSeconds(0.1);
 
-            var managedClient =
-              new ManagedMqttClient(underlyingClient ?? testEnvironment.CreateClient(), new MqttNetLogger().CreateChildLogger());
+            var managedClient = new ManagedMqttClient(underlyingClient ?? testEnvironment.CreateClient(), new MqttNetLogger());
 
             var connected = GetConnectedTask(managedClient);
 
@@ -365,7 +445,7 @@ namespace MQTTnet.Tests
         /// <summary>
         /// Returns a task that will finish when the <paramref name="managedClient"/> has connected
         /// </summary>
-        private Task GetConnectedTask(ManagedMqttClient managedClient)
+        Task GetConnectedTask(ManagedMqttClient managedClient)
         {
             TaskCompletionSource<bool> connected = new TaskCompletionSource<bool>();
             managedClient.ConnectedHandler = new MqttClientConnectedHandlerDelegate(e =>
@@ -380,25 +460,28 @@ namespace MQTTnet.Tests
         /// Returns a task that will return the messages received on <paramref name="managedClient"/>
         /// when <paramref name="expectedNumberOfMessages"/> have been received
         /// </summary>
-        private Task<List<MqttApplicationMessage>> SetupReceivingOfMessages(ManagedMqttClient managedClient, int expectedNumberOfMessages)
+        Task<List<MqttApplicationMessage>> SetupReceivingOfMessages(ManagedMqttClient managedClient, int expectedNumberOfMessages)
         {
             var receivedMessages = new List<MqttApplicationMessage>();
-            var allReceived = new TaskCompletionSource<List<MqttApplicationMessage>>();
+            var result = new TaskCompletionSource<List<MqttApplicationMessage>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
             managedClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(r =>
             {
                 receivedMessages.Add(r.ApplicationMessage);
+
                 if (receivedMessages.Count == expectedNumberOfMessages)
                 {
-                    allReceived.SetResult(receivedMessages);
+                    result.TrySetResult(receivedMessages);
                 }
             });
-            return allReceived.Task;
+
+            return result.Task;
         }
     }
 
     public class ManagedMqttClientTestStorage : IManagedMqttClientStorage
     {
-        private IList<ManagedMqttApplicationMessage> _messages = null;
+        IList<ManagedMqttApplicationMessage> _messages;
 
         public Task<IList<ManagedMqttApplicationMessage>> LoadQueuedMessagesAsync()
         {
@@ -406,6 +489,7 @@ namespace MQTTnet.Tests
             {
                 _messages = new List<ManagedMqttApplicationMessage>();
             }
+
             return Task.FromResult(_messages);
         }
 

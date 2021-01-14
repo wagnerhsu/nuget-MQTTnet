@@ -1,6 +1,4 @@
-﻿using System;
-using System.Linq;
-using MQTTnet.Client.Connecting;
+﻿using MQTTnet.Client.Connecting;
 using MQTTnet.Client.Disconnecting;
 using MQTTnet.Client.Options;
 using MQTTnet.Client.Publishing;
@@ -10,6 +8,9 @@ using MQTTnet.Exceptions;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using MqttClientSubscribeResult = MQTTnet.Client.Subscribing.MqttClientSubscribeResult;
 
 namespace MQTTnet.Formatter.V3
@@ -36,6 +37,15 @@ namespace MQTTnet.Formatter.V3
             {
                 PacketIdentifier = publishPacket.PacketIdentifier,
                 ReasonCode = MqttPubAckReasonCode.Success
+            };
+        }
+
+        public MqttBasePacket CreatePubRecPacket(MqttPublishPacket publishPacket)
+        {
+            return new MqttPubRecPacket
+            {
+                PacketIdentifier = publishPacket.PacketIdentifier,
+                ReasonCode = MqttPubRecReasonCode.Success
             };
         }
 
@@ -153,7 +163,7 @@ namespace MQTTnet.Formatter.V3
         {
             if (unsubscribePacket == null) throw new ArgumentNullException(nameof(unsubscribePacket));
             if (unsubAckPacket == null) throw new ArgumentNullException(nameof(unsubAckPacket));
-            
+
             var result = new MqttClientUnsubscribeResult();
 
             result.Items.AddRange(unsubscribePacket.TopicFilters.Select((t, i) =>
@@ -168,8 +178,20 @@ namespace MQTTnet.Formatter.V3
 
             var subscribePacket = new MqttSubscribePacket();
             subscribePacket.TopicFilters.AddRange(options.TopicFilters);
-            
+
             return subscribePacket;
+        }
+
+        public MqttSubAckPacket CreateSubAckPacket(MqttSubscribePacket subscribePacket, Server.MqttClientSubscribeResult subscribeResult)
+        {
+            var subackPacket = new MqttSubAckPacket
+            {
+                PacketIdentifier = subscribePacket.PacketIdentifier
+            };
+
+            subackPacket.ReturnCodes.AddRange(subscribeResult.ReturnCodes);
+
+            return subackPacket;
         }
 
         public MqttUnsubscribePacket CreateUnsubscribePacket(MqttClientUnsubscribeOptions options)
@@ -182,11 +204,20 @@ namespace MQTTnet.Formatter.V3
             return unsubscribePacket;
         }
 
+        public MqttUnsubAckPacket CreateUnsubAckPacket(MqttUnsubscribePacket unsubscribePacket, List<MqttUnsubscribeReasonCode> reasonCodes)
+        {
+            return new MqttUnsubAckPacket
+            {
+                PacketIdentifier = unsubscribePacket.PacketIdentifier,
+                ReasonCodes = reasonCodes
+            };
+        }
+
         public MqttDisconnectPacket CreateDisconnectPacket(MqttClientDisconnectOptions options)
         {
-            if (options != null)
+            if (options.ReasonCode != MqttClientDisconnectReason.NormalDisconnection || options.ReasonString != null)
             {
-                throw new MqttProtocolViolationException("Reason codes for disconnect are only supported for MQTTv5.");
+                throw new MqttProtocolViolationException("Reason codes and reason string for disconnect are only supported for MQTTv5.");
             }
 
             return new MqttDisconnectPacket();

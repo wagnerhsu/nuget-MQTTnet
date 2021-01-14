@@ -1,15 +1,17 @@
-﻿using System.Threading.Tasks;
-using MQTTnet.Diagnostics;
+﻿using MQTTnet.Diagnostics;
+using System.Threading.Tasks;
 
 namespace MQTTnet.Internal
 {
     public static class TaskExtensions
     {
-        public static void Forget(this Task task, IMqttNetChildLogger logger)
+        public static void RunInBackground(this Task task, IMqttNetScopedLogger logger = null)
         {
             task?.ContinueWith(t =>
                 {
-                    logger.Error(t.Exception, "Unhandled exception.");
+                    // Consume the exception first so that we get no exception regarding the not observed exception.
+                    var exception = t.Exception;
+                    logger?.Error(exception, "Unhandled exception in background task.");
                 },
                 TaskContinuationOptions.OnlyOnFaulted);
         }

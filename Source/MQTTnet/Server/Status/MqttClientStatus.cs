@@ -1,16 +1,17 @@
-﻿using System;
+﻿using MQTTnet.Formatter;
+using System;
 using System.Threading.Tasks;
-using MQTTnet.Formatter;
+using MQTTnet.Protocol;
 
 namespace MQTTnet.Server.Status
 {
-    public class MqttClientStatus : IMqttClientStatus
+    public sealed class MqttClientStatus : IMqttClientStatus
     {
-        private readonly MqttClientConnection _connection;
+        readonly MqttClientConnection _connection;
 
         public MqttClientStatus(MqttClientConnection connection)
         {
-            _connection = connection;
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         }
 
         public string ClientId { get; set; }
@@ -41,7 +42,7 @@ namespace MQTTnet.Server.Status
 
         public Task DisconnectAsync()
         {
-            return _connection.StopAsync();
+            return _connection.StopAsync(MqttDisconnectReasonCode.NormalDisconnection);
         }
 
         public void ResetStatistics()
