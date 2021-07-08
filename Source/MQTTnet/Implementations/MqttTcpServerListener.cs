@@ -98,7 +98,7 @@ namespace MQTTnet.Implementations
         {
             _socket?.Dispose();
 
-#if NETSTANDARD1_3 || NETSTANDARD2_0 || NET461 || NET472
+#if !NET452
             _tlsCertificate?.Dispose();
 #endif
         }
@@ -178,7 +178,11 @@ namespace MQTTnet.Implementations
                 var clientHandler = ClientHandler;
                 if (clientHandler != null)
                 {
-                    using (var clientAdapter = new MqttChannelAdapter(new MqttTcpChannel(stream, remoteEndPoint, clientCertificate), new MqttPacketFormatterAdapter(new MqttPacketWriter()), _rootLogger))
+                    using (var clientAdapter = new MqttChannelAdapter(
+                        new MqttTcpChannel(stream, remoteEndPoint, clientCertificate),
+                        new MqttPacketFormatterAdapter(new MqttPacketWriter()),
+                        null,
+                        _rootLogger))
                     {
                         await clientHandler(clientAdapter).ConfigureAwait(false);
                     }

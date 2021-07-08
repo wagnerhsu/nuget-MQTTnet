@@ -164,19 +164,13 @@ namespace MQTTnet.Server
             _options.ConnectionValidator = new MqttServerConnectionValidatorDelegate(value);
             return this;
         }
-
-        public MqttServerOptionsBuilder WithDisconnectedInterceptor(IMqttServerClientDisconnectedHandler value)
+        
+        public MqttServerOptionsBuilder WithConnectionValidator(Func<MqttConnectionValidatorContext, Task> value)
         {
-            _options.ClientDisconnectedInterceptor = value;
+            _options.ConnectionValidator = new MqttServerConnectionValidatorDelegate(value);
             return this;
         }
-
-        public MqttServerOptionsBuilder WithDisconnectedInterceptor(Action<MqttServerClientDisconnectedEventArgs> value)
-        {
-            _options.ClientDisconnectedInterceptor = new MqttServerClientDisconnectedHandlerDelegate(value);
-            return this;
-        }
-
+        
         public MqttServerOptionsBuilder WithApplicationMessageInterceptor(IMqttServerApplicationMessageInterceptor value)
         {
             _options.ApplicationMessageInterceptor = value;

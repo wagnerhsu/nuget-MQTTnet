@@ -8,6 +8,10 @@ namespace MQTTnet.Server
 
         public MqttServerTlsTcpEndpointOptions TlsEndpointOptions { get; } = new MqttServerTlsTcpEndpointOptions();
 
+        /// <summary>
+        /// Gets or sets the client identifier.
+        /// Hint: This identifier needs to be unique over all used clients / devices on the broker to avoid connection issues.
+        /// </summary>
         public string ClientId { get; set; }
 
         public bool EnablePersistentSessions { get; set; }
@@ -30,12 +34,10 @@ namespace MQTTnet.Server
 
         public IMqttServerUnsubscriptionInterceptor UnsubscriptionInterceptor { get; set; }
 
+        public IMqttServerApplicationMessageInterceptor UndeliveredMessageInterceptor { get; set; }
+
         public IMqttServerStorage Storage { get; set; }
 
         public IMqttRetainedMessagesManager RetainedMessagesManager { get; set; } = new MqttRetainedMessagesManager();
-
-        public IMqttServerApplicationMessageInterceptor UndeliveredMessageInterceptor { get; set; }
-
-        public IMqttServerClientDisconnectedHandler ClientDisconnectedInterceptor { get; set; }
     }
 }

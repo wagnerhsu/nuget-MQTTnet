@@ -5,9 +5,10 @@ using MQTTnet.Extensions.Rpc.Options.TopicGeneration;
 using MQTTnet.Protocol;
 using System;
 using System.Collections.Concurrent;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MQTTnet.Client.Subscribing;
+using MQTTnet.Implementations;
 
 namespace MQTTnet.Extensions.Rpc
 {
@@ -35,22 +36,27 @@ namespace MQTTnet.Extensions.Rpc
             _mqttClient.ApplicationMessageReceivedHandler = _applicationMessageReceivedHandler;
         }
 
-        public Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, string payload, MqttQualityOfServiceLevel qualityOfServiceLevel)
+        public async Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel)
         {
-            return ExecuteAsync(timeout, methodName, Encoding.UTF8.GetBytes(payload), qualityOfServiceLevel, CancellationToken.None);
+            using (var timeoutToken = new CancellationTokenSource(timeout))
+            {
+                try
+                {
+                    return await ExecuteAsync(methodName, payload, qualityOfServiceLevel, timeoutToken.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException exception)
+                {
+                    if (timeoutToken.IsCancellationRequested)
+                    {
+                        throw new MqttCommunicationTimedOutException(exception);
+                    }
+
+                    throw;
+                }
+            }
         }
 
-        public Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, string payload, MqttQualityOfServiceLevel qualityOfServiceLevel, CancellationToken cancellationToken)
-        {
-            return ExecuteAsync(timeout, methodName, Encoding.UTF8.GetBytes(payload), qualityOfServiceLevel, cancellationToken);
-        }
-
-        public Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel)
-        {
-            return ExecuteAsync(timeout, methodName, payload, qualityOfServiceLevel, CancellationToken.None);
-        }
-
-        public async Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel, CancellationToken cancellationToken)
+        public async Task<byte[]> ExecuteAsync(string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel, CancellationToken cancellationToken)
         {
             if (methodName == null) throw new ArgumentNullException(nameof(methodName));
 
@@ -88,62 +94,54 @@ namespace MQTTnet.Extensions.Rpc
 
             try
             {
-                var tcs = new TaskCompletionSource<byte[]>();
-                if (!_waitingCalls.TryAdd(responseTopic, tcs))
+#if NET452
+                var promise = new TaskCompletionSource<byte[]>();
+#else
+                var promise = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+#endif
+                
+                if (!_waitingCalls.TryAdd(responseTopic, promise))
                 {
                     throw new InvalidOperationException();
                 }
 
-                await _mqttClient.SubscribeAsync(responseTopic, qualityOfServiceLevel).ConfigureAwait(false);
-                await _mqttClient.PublishAsync(requestMessage).ConfigureAwait(false);
+                var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
+                    .WithTopicFilter(responseTopic, qualityOfServiceLevel)
+                    .Build();
 
-                using (var timeoutCts = new CancellationTokenSource(timeout))
-                using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token))
+                await _mqttClient.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
+                await _mqttClient.PublishAsync(requestMessage, cancellationToken).ConfigureAwait(false);
+
+                using (cancellationToken.Register(() => { promise.TrySetCanceled(); }))
                 {
-                    linkedCts.Token.Register(() =>
-                    {
-                        if (!tcs.Task.IsCompleted && !tcs.Task.IsFaulted && !tcs.Task.IsCanceled)
-                        {
-                            tcs.TrySetCanceled();
-                        }
-                    });
-
-                    try
-                    {
-                        var result = await tcs.Task.ConfigureAwait(false);
-                        timeoutCts.Cancel(false);
-                        return result;
-                    }
-                    catch (OperationCanceledException exception)
-                    {
-                        if (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-                        {
-                            throw new MqttCommunicationTimedOutException(exception);
-                        }
-                        else
-                        {
-                            throw;
-                        }
-                    }
+                    return await promise.Task.ConfigureAwait(false);
                 }
             }
             finally
             {
                 _waitingCalls.TryRemove(responseTopic, out _);
+
                 await _mqttClient.UnsubscribeAsync(responseTopic).ConfigureAwait(false);
             }
         }
 
         Task HandleApplicationMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs eventArgs)
         {
-            if (!_waitingCalls.TryRemove(eventArgs.ApplicationMessage.Topic, out var tcs))
+            if (!_waitingCalls.TryRemove(eventArgs.ApplicationMessage.Topic, out var promise))
             {
-                return Task.FromResult(0);
+                return PlatformAbstractionLayer.CompletedTask;
             }
 
-            tcs.TrySetResult(eventArgs.ApplicationMessage.Payload);
+#if NET452
+            Task.Run(() => promise.TrySetResult(eventArgs.ApplicationMessage.Payload));
+#else
+            promise.TrySetResult(eventArgs.ApplicationMessage.Payload);
+#endif
 
-            return Task.FromResult(0);
+            // Set this message to handled to that other code can avoid execution etc.
+            eventArgs.IsHandled = true;
+
+            return PlatformAbstractionLayer.CompletedTask;
         }
 
         public void Dispose()
