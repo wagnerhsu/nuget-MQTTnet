@@ -1,4 +1,8 @@
-﻿namespace MQTTnet.Client.Disconnecting
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+namespace MQTTnet.Client
 {
     public enum MqttClientDisconnectReason
     {
@@ -12,7 +16,7 @@
         ServerBusy = 137,
         ServerShuttingDown = 139,
         BadAuthenticationMethod = 140,
-        KeepaliveTimeout = 141,
+        KeepAliveTimeout = 141,
         SessionTakenOver = 142,
         TopicFilterInvalid = 143,
         TopicNameInvalid = 144,

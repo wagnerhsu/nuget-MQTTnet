@@ -1,29 +1,29 @@
-﻿using System;
-using MQTTnet.Client.Connecting;
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
 
-namespace MQTTnet.Client.Disconnecting
+using System;
+
+namespace MQTTnet.Client
 {
     public sealed class MqttClientDisconnectedEventArgs : EventArgs
     {
-        public MqttClientDisconnectedEventArgs(bool clientWasConnected, Exception exception, MqttClientAuthenticateResult authenticateResult, MqttClientDisconnectReason reason)
-        {
-            ClientWasConnected = clientWasConnected;
-            Exception = exception;
-            AuthenticateResult = authenticateResult;
-            Reason = reason;
+        public bool ClientWasConnected { get; internal set; }
 
-            ReasonCode = reason;
-        }
+        public Exception Exception { get; internal set; }
 
-        public bool ClientWasConnected { get; }
+        /// <summary>
+        /// Gets the authentication result.
+        /// Hint: MQTT 5 feature only.
+        /// </summary>
+        public MqttClientConnectResult ConnectResult { get; internal set; }
 
-        public Exception Exception { get; }
-
-        public MqttClientAuthenticateResult AuthenticateResult { get; }
-
-        public MqttClientDisconnectReason Reason { get; set; }
-
-        [Obsolete("Please use 'Reason' instead. This property will be removed in the future!")]
-        public MqttClientDisconnectReason ReasonCode { get; set; }
+        /// <summary>
+        /// Gets or sets the reason.
+        /// Hint: MQTT 5 feature only.
+        /// </summary>
+        public MqttClientDisconnectReason Reason { get; internal set; }
+        
+        public string ReasonString { get; internal set; }
     }
 }

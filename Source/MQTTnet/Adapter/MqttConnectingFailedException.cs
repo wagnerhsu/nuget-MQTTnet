@@ -1,17 +1,23 @@
-﻿using MQTTnet.Client.Connecting;
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using System;
+using MQTTnet.Client;
 using MQTTnet.Exceptions;
 
 namespace MQTTnet.Adapter
 {
-    public class MqttConnectingFailedException : MqttCommunicationException
+    public sealed class MqttConnectingFailedException : MqttCommunicationException
     {
-        public MqttConnectingFailedException(MqttClientAuthenticateResult result)
-            : base($"Connecting with MQTT server failed ({result.ResultCode.ToString()}).")
+        public MqttConnectingFailedException(string message, Exception innerException, MqttClientConnectResult connectResult)
+            : base(message, innerException)
         {
-            Result = result;
+            Result = connectResult;
         }
 
-        public MqttClientAuthenticateResult Result { get; }
-        public MqttClientConnectResultCode ResultCode => Result.ResultCode;
+        public MqttClientConnectResult Result { get; }
+
+        public MqttClientConnectResultCode ResultCode => Result?.ResultCode ?? MqttClientConnectResultCode.UnspecifiedError;
     }
 }

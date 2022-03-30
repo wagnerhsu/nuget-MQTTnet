@@ -1,34 +1,35 @@
-﻿using MQTTnet.Adapter;
-using MQTTnet.Client.Options;
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using MQTTnet.Adapter;
 using MQTTnet.Diagnostics;
 using MQTTnet.Formatter;
 using System;
+using MQTTnet.Channel;
+using MQTTnet.Client;
 
 namespace MQTTnet.Implementations
 {
-    public class MqttClientAdapterFactory : IMqttClientAdapterFactory
+    public sealed class MqttClientAdapterFactory : IMqttClientAdapterFactory
     {
-        readonly IMqttNetLogger _logger;
-
-        public MqttClientAdapterFactory(IMqttNetLogger logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        public IMqttChannelAdapter CreateClientAdapter(IMqttClientOptions options)
+        public IMqttChannelAdapter CreateClientAdapter(MqttClientOptions options, MqttPacketInspector packetInspector, IMqttNetLogger logger)
         {
             if (options == null) throw new ArgumentNullException(nameof(options));
 
+            IMqttChannel channel;
             switch (options.ChannelOptions)
             {
                 case MqttClientTcpOptions _:
                     {
-                        return new MqttChannelAdapter(new MqttTcpChannel(options), new MqttPacketFormatterAdapter(options.ProtocolVersion, new MqttPacketWriter()), _logger);
+                        channel = new MqttTcpChannel(options);
+                        break;
                     }
 
                 case MqttClientWebSocketOptions webSocketOptions:
                     {
-                        return new MqttChannelAdapter(new MqttWebSocketChannel(webSocketOptions), new MqttPacketFormatterAdapter(options.ProtocolVersion, new MqttPacketWriter()), _logger);
+                        channel = new MqttWebSocketChannel(webSocketOptions);
+                        break;
                     }
 
                 default:
@@ -36,6 +37,10 @@ namespace MQTTnet.Implementations
                         throw new NotSupportedException();
                     }
             }
+
+            var bufferWriter = new MqttBufferWriter(options.WriterBufferSize, options.WriterBufferSizeMax);
+            var packetFormatterAdapter = new MqttPacketFormatterAdapter(options.ProtocolVersion, bufferWriter);
+            return new MqttChannelAdapter(channel, packetFormatterAdapter, packetInspector, logger);
         }
     }
 }
