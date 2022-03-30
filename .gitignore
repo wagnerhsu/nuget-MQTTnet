@@ -296,3 +296,4 @@ __pycache__/
 Build/NuGet/
 libs/
 Logs/
+.vscode/
