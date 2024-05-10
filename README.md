@@ -4,7 +4,7 @@
 </p>
 
 [![NuGet Badge](https://buildstats.info/nuget/MQTTnet)](https://www.nuget.org/packages/MQTTnet)
-[![CI](https://github.com/dotnet/MQTTnet/actions/workflows/ci.yml/badge.svg)](https://github.com/dotnet/MQTTnet/actions/workflows/ci.yml)
+[![CI](https://github.com/dotnet/MQTTnet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dotnet/MQTTnet/actions/workflows/ci.yml)
 [![MyGet](https://img.shields.io/myget/mqttnet/v/mqttnet?color=orange&label=MyGet-Preview)](https://www.myget.org/feed/mqttnet/package/nuget/MQTTnet)
 ![Size](https://img.shields.io/github/repo-size/dotnet/MQTTnet.svg)
 [![Join the chat at https://gitter.im/MQTTnet/community](https://badges.gitter.im/MQTTnet/community.svg)](https://gitter.im/MQTTnet/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -12,7 +12,7 @@
 
 # MQTTnet
 
-MQTTnet is a high performance .NET library for MQTT based communication. It provides a MQTT client and a MQTT server (broker) and supports the MQTT protocol up to version 5.
+MQTTnet is a high performance .NET library for MQTT based communication. It provides a MQTT client and a MQTT server (broker) and supports the MQTT protocol up to version 5. It is compatible with mostly any supported .NET Framework version and CPU architecture.
 
 ## Features
 
@@ -49,40 +49,22 @@ MQTTnet is a high performance .NET library for MQTT based communication. It prov
 * WebSockets supported (via ASP.NET Core 2.0, separate nuget)
 * A custom message interceptor can be added which allows transforming or extending every received application message
 * Validate subscriptions and deny subscribing of certain topics depending on requesting clients
-* Connect clients with different protocol versions at the same time.
 
-## Supported frameworks
+## Getting Started
 
-| Framwork           | Version     |
-| ------------------ | ----------- |
-|.NET                | 5.0+        |
-|.NET Framework      | 4.5.2+      |
-|.NET Standard       | 1.3+        |
-|.NET Core           | 1.1+        |
-|.NET Core App       | 1.1+        |
-| Mono               | 5.2+        |
-| UWP                | 10.0.10240+ |
-| Xamarin.Android    | 7.5+        |
-| Xamarin.iOS        | 10.14+      |
-| Blazor WebAssembly | 3.2.0+      |
+MQTTnet is delivered via <b>NuGet</b> package manager. You can find the packages here: https://www.nuget.org/packages/MQTTnet/
 
-## References
+Use these command in the Package Manager console to install MQTTnet manually:
+```
+Install-Package MQTTnet
+```
 
-This library is used in the following projects:
+Samples for using MQTTnet are part of this repository. For starters these samples are recommended:
 
-* Azure Functions MQTT Bindings, <https://github.com/keesschollaart81/CaseOnline.Azure.WebJobs.Extensions.Mqtt>)
-* HA4IoT (Open Source Home Automation system for .NET, <https://github.com/chkr1011/HA4IoT>)
-* MQTT Client Rx (Wrapper for Reactive Extensions, <https://github.com/1iveowl/MQTTClient.rx>)
-* MQTT Client Rx (Managed Client Wrapper for Reactive Extensions, <https://github.com/mmuecke/RxMQTTnet>)
-* MQTT Tester (MQTT client test app for [Android](https://play.google.com/store/apps/details?id=com.liveowl.mqtttester) and [iOS](https://itunes.apple.com/us/app/mqtt-tester/id1278621826?mt=8))
-* MQTTnet App (Cross platform client application for MQTT debugging, inspection etc., <https://github.com/chkr1011/MQTTnetApp>)
-* Wirehome.Core (Open Source Home Automation system for .NET Core, <https://github.com/chkr1011/Wirehome.Core>)
-* SparkplugNet (Sparkplug library for .Net, <https://github.com/SeppPenner/SparkplugNet>)
-* Silverback (Framework to build event-driven applications - support for MQTT, Kafka & RabbitMQ) <https://github.com/BEagle1984/silverback>
-
-Further projects using this project can be found under https://github.com/dotnet/MQTTnet/network/dependents.
-
-If you use this library and want to see your project here please create a pull request.
+- [Connect with a broker](https://github.com/dotnet/MQTTnet/blob/master/Samples/Client/Client_Connection_Samples.cs)
+- [Subscribing to data](https://github.com/dotnet/MQTTnet/blob/master/Samples/Client/Client_Subscribe_Samples.cs)
+- [Publishing data](https://github.com/dotnet/MQTTnet/blob/master/Samples/Client/Client_Publish_Samples.cs)
+- [Host own broker](https://github.com/dotnet/MQTTnet/blob/master/Samples/Server/Server_Simple_Samples.cs)
 
 ## Code of Conduct
 

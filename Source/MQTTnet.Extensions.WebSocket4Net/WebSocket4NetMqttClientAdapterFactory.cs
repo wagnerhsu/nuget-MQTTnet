@@ -2,12 +2,12 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using MQTTnet.Adapter;
-using MQTTnet.Formatter;
-using MQTTnet.Implementations;
 using System;
+using MQTTnet.Adapter;
 using MQTTnet.Client;
 using MQTTnet.Diagnostics;
+using MQTTnet.Formatter;
+using MQTTnet.Implementations;
 
 namespace MQTTnet.Extensions.WebSocket4Net
 {
@@ -15,7 +15,10 @@ namespace MQTTnet.Extensions.WebSocket4Net
     {
         public IMqttChannelAdapter CreateClientAdapter(MqttClientOptions options, MqttPacketInspector packetInspector, IMqttNetLogger logger)
         {
-            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
 
             switch (options.ChannelOptions)
             {
@@ -23,24 +26,28 @@ namespace MQTTnet.Extensions.WebSocket4Net
                 {
                     return new MqttChannelAdapter(
                         new MqttTcpChannel(options),
-                        new MqttPacketFormatterAdapter(options.ProtocolVersion, new MqttBufferWriter(4096, 65535)),
-                        packetInspector,
-                        logger);
+                        new MqttPacketFormatterAdapter(options.ProtocolVersion, new MqttBufferWriter(options.WriterBufferSize, options.WriterBufferSizeMax)),
+                        logger)
+                    {
+                        PacketInspector = packetInspector
+                    };
                 }
 
                 case MqttClientWebSocketOptions webSocketOptions:
                 {
                     return new MqttChannelAdapter(
                         new WebSocket4NetMqttChannel(options, webSocketOptions),
-                        new MqttPacketFormatterAdapter(options.ProtocolVersion, new MqttBufferWriter(4068, 65535)), 
-                        packetInspector,
-                        logger);
+                        new MqttPacketFormatterAdapter(options.ProtocolVersion, new MqttBufferWriter(options.WriterBufferSize, options.WriterBufferSizeMax)),
+                        logger)
+                    {
+                        PacketInspector = packetInspector
+                    };
                 }
 
                 default:
-                    {
-                        throw new NotSupportedException();
-                    }
+                {
+                    throw new NotSupportedException();
+                }
             }
         }
     }

@@ -6,7 +6,6 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 using MQTTnet.Formatter;
-using MQTTnet.Implementations;
 using MQTTnet.Internal;
 
 namespace MQTTnet.Server
@@ -19,44 +18,52 @@ namespace MQTTnet.Server
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
         }
-        
-        public string Id => _session.Id;
-
-        public long PendingApplicationMessagesCount => _session.PendingDataPacketsCount;
 
         public DateTime CreatedTimestamp => _session.CreatedTimestamp;
 
+        public DateTime? DisconnectedTimestamp => _session.DisconnectedTimestamp;
+
+        public uint ExpiryInterval => _session.ExpiryInterval;
+
+        public string Id => _session.Id;
+
         public IDictionary Items => _session.Items;
-        
-        public Task EnqueueApplicationMessageAsync(MqttApplicationMessage applicationMessage)
+
+        public long PendingApplicationMessagesCount => _session.PendingDataPacketsCount;
+
+        public Task ClearApplicationMessagesQueueAsync()
         {
-            if (applicationMessage == null) throw new ArgumentNullException(nameof(applicationMessage));
-            
-            var publishPacketFactory = new MqttPublishPacketFactory();
-            _session.EnqueuePacket(new MqttPacketBusItem(publishPacketFactory.Create(applicationMessage)));
-            
-            return PlatformAbstractionLayer.CompletedTask;
+            throw new NotImplementedException();
         }
 
-        public Task DeliverApplicationMessageAsync(MqttApplicationMessage applicationMessage)
-        {
-            if (applicationMessage == null) throw new ArgumentNullException(nameof(applicationMessage));
-            
-            var publishPacketFactory = new MqttPublishPacketFactory();
-            var packetBusItem = new MqttPacketBusItem(publishPacketFactory.Create(applicationMessage));
-            _session.EnqueuePacket(packetBusItem);
-
-            return packetBusItem.WaitForDeliveryAsync();
-        }
-        
         public Task DeleteAsync()
         {
             return _session.DeleteAsync();
         }
-        
-        public Task ClearApplicationMessagesQueueAsync()
+
+        public Task DeliverApplicationMessageAsync(MqttApplicationMessage applicationMessage)
         {
-            throw new NotImplementedException();
+            if (applicationMessage == null)
+            {
+                throw new ArgumentNullException(nameof(applicationMessage));
+            }
+
+            var packetBusItem = new MqttPacketBusItem(MqttPacketFactories.Publish.Create(applicationMessage));
+            _session.EnqueueDataPacket(packetBusItem);
+
+            return packetBusItem.WaitAsync();
+        }
+
+        public Task EnqueueApplicationMessageAsync(MqttApplicationMessage applicationMessage)
+        {
+            if (applicationMessage == null)
+            {
+                throw new ArgumentNullException(nameof(applicationMessage));
+            }
+
+            _session.EnqueueDataPacket(new MqttPacketBusItem(MqttPacketFactories.Publish.Create(applicationMessage)));
+
+            return CompletedTask.Instance;
         }
     }
 }

@@ -1,27 +1,10 @@
-We have joined the .NET Foundation!
-
-Version 4 comes with a new API so a lot of breaking changes should be expected.
-Checkout the upgrade guide (https://github.com/dotnet/MQTTnet/wiki/Upgrading-guide) for an overview of the changes.
-Checkout the new samples (https://github.com/dotnet/MQTTnet/tree/feature/master/Samples) how to use the new API. The wiki only remains for version 3 of this library.
-
-* [Core] Improved memory management when working with large payloads.
-* [Core] Added support for .NET 6.0.
-* [Core] nuget packages are now created by MSBuild including more information (i.e. commit hash).
-* [Client] Exposed socket linger state in options.
-* [Client] The OS will now choose the best TLS version to use. It is no longer fixed to 1.3 etc. (thanks to @patagonaa, #1271).
-* [Client] Added support for _ServerKeepAlive_ (MQTTv5).
-* [Client] Exposed user properties and reason string in subscribe result.
-* [Client] Exposed user properties and reason string in unsubscribe result.
-* [Client] Migrated application message handler to a regular .NET event (BREAKING CHANGE!).
-* [Client] The will message is longer a regular application message due to not supported properties by the will message (BREAKING CHANGE!).
-* [Client] Timeouts are no longer handled inside the library. Each method (Connect, Publish etc.) supports a cancellation token so that custom timeouts can and must be used (BREAKING CHANGE!). 
-* [Server] Exposed socket linger state in options.
-* [Server] Added support for returning individual subscription errors (#80 thanks to @jimch)
-* [Server] Improved topic filter comparisons (support for $).
-* [Server] Added more MQTTv5 response information to all interceptors (BREAKING CHANGE!).
-* [Server] Improved session management for MQTT v5 (#1294, thanks to @logicaloud).
-* [Server] All interceptors and events are migrated from interfaces to simple events. All existing APIs are availble but must be migrated to corresponding events (BREAKING CHANGE!).
-* [Server] Removed all interceptor and event interfaces including the delegate implementations etc. (BREAKING CHANGE!).
-* [Server] Renamed a lot of classes and adjusted namespaces (BREAKING CHANGE!).
-* [Server] Introduced a new queueing approach for internal message process (packet bus).
-* [Server] For security reasons the default endpoint (1883) is no longer enabled by default (BREAKING CHANGE!).
+* [Core] Optimized packet serialization of PUBACK and PUBREC packets for protocol version 5.0.0 (#1939, thanks to @Y-Sindo).
+* [Core] The package inspector is now fully async (#1941).
+* [Client] Added a dedicated exception when the client is not connected (#1954, thanks to @marcpiulachs).
+* [Client] The client will now throw a _MqttClientUnexpectedDisconnectReceivedException_ when publishing a QoS 0 message which leads to a server disconnect (BREAKING CHANGE!, #1974, thanks to @fazho).
+* [Client] Exposed the certificate selection event handler in client options (#1984).
+* [Server] The server will no longer send _NoMatchingSubscribers_ when the actual subscription was non success (#1965, BREAKING CHANGE!).
+* [Server] Fixed broken support for _null_ in _AddServer_ method in ASP.NET integration (#1981).
+* [ManagedClient] Added a new event (SubscriptionsChangedAsync) which is fired when a subscription or unsubscription was made (#1894, thanks to @pdufrene).
+* [ManagedClient] Fixed race condition when server shuts down while subscribing (#1987, thanks to @marve).
+* [TopicTemplate] Added new extension which provides a template engine for topics (#1932, thanks to @simonthum).

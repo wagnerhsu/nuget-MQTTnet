@@ -1,5 +1,8 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using MQTTnet.Client;
 using MQTTnet.Server;
 using System;
@@ -8,14 +11,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-
 namespace MQTTnet.Benchmarks
 {
-    /// <summary>
-    /// Create a number of topics, publish, subscribe, and wait for response
-    /// </summary>
     [MemoryDiagnoser]
-    public class MessageDeliveryBenchmark
+    public class MessageDeliveryBenchmark : BaseBenchmark
     {
         List<MqttApplicationMessage> _topicPublishMessages;
 
@@ -37,8 +36,8 @@ namespace MQTTnet.Benchmarks
         CancellationTokenSource _cancellationTokenSource;
 
         MqttServer _mqttServer;
-        List<MQTTnet.Client.MqttClient> _mqttSubscriberClients;
-        Dictionary<string, MQTTnet.Client.MqttClient> _mqttPublisherClientsByPublisherName;
+        List<IMqttClient> _mqttSubscriberClients;
+        Dictionary<string, IMqttClient> _mqttPublisherClientsByPublisherName;
 
         Dictionary<string, List<string>> _topicsByPublisher;
         Dictionary<string, string> _publisherByTopic;        
@@ -74,7 +73,7 @@ namespace MQTTnet.Benchmarks
             _mqttServer.StartAsync().GetAwaiter().GetResult();
 
             // Create publisher clients
-            _mqttPublisherClientsByPublisherName = new Dictionary<string, MQTTnet.Client.MqttClient>();
+            _mqttPublisherClientsByPublisherName = new Dictionary<string, IMqttClient>();
             foreach (var pt in _topicsByPublisher)
             {
                 var publisherName = pt.Key;
@@ -89,7 +88,7 @@ namespace MQTTnet.Benchmarks
             }
 
             // Create subscriber clients
-            _mqttSubscriberClients = new List<MQTTnet.Client.MqttClient>();
+            _mqttSubscriberClients = new List<IMqttClient>();
             for (var i = 0; i < NumSubscribers; i++)
             {
                 var mqttSubscriberClient = factory.CreateMqttClient();

@@ -1,5 +1,8 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using MQTTnet.Client;
 using MQTTnet.Server;
 using System.Collections.Generic;
@@ -8,10 +11,10 @@ using System.Linq;
 namespace MQTTnet.Benchmarks
 {
     [MemoryDiagnoser]
-    public class UnsubscribeBenchmark
+    public class UnsubscribeBenchmark : BaseBenchmark 
     {
         MqttServer _mqttServer;
-        MQTTnet.Client.MqttClient _mqttClient;
+        IMqttClient _mqttClient;
 
         const int NumPublishers = 1;
         const int NumTopicsPerPublisher = 10000;
@@ -40,7 +43,7 @@ namespace MQTTnet.Benchmarks
             foreach (var topic in _topics)
             {
                 var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-                       .WithTopicFilter(topic, Protocol.MqttQualityOfServiceLevel.AtMostOnce)
+                       .WithTopicFilter(topic)
                        .Build();
                 _mqttClient.SubscribeAsync(subscribeOptions).GetAwaiter().GetResult();
             }

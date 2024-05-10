@@ -7,9 +7,9 @@ using MQTTnet.Packets;
 
 namespace MQTTnet.Formatter
 {
-    public sealed class MqttApplicationMessageFactory
+    public static class MqttApplicationMessageFactory
     {
-        public MqttApplicationMessage Create(MqttPublishPacket publishPacket)
+        public static MqttApplicationMessage Create(MqttPublishPacket publishPacket)
         {
             if (publishPacket == null)
             {
@@ -19,7 +19,7 @@ namespace MQTTnet.Formatter
             return new MqttApplicationMessage
             {
                 Topic = publishPacket.Topic,
-                Payload = publishPacket.Payload,
+                PayloadSegment = publishPacket.PayloadSegment,
                 QualityOfServiceLevel = publishPacket.QualityOfServiceLevel,
                 Retain = publishPacket.Retain,
                 Dup = publishPacket.Dup,

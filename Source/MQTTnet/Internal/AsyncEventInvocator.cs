@@ -21,12 +21,14 @@ namespace MQTTnet.Internal
 
         public bool WrapsHandler(Action<TEventArgs> handler)
         {
-            return ReferenceEquals(_handler, handler);
+            // Do not use ReferenceEquals! It will not work with delegates.
+            return handler == _handler;
         }
         
         public bool WrapsHandler(Func<TEventArgs, Task> handler)
         {
-            return ReferenceEquals(_asyncHandler, handler);
+            // Do not use ReferenceEquals! It will not work with delegates.
+            return handler == _asyncHandler;
         }
         
         public Task InvokeAsync(TEventArgs eventArgs)
@@ -34,7 +36,7 @@ namespace MQTTnet.Internal
             if (_handler != null)
             {
                 _handler.Invoke(eventArgs);
-                return PlatformAbstractionLayer.CompletedTask;
+                return CompletedTask.Instance;
             }
 
             if (_asyncHandler != null)

@@ -12,6 +12,8 @@ namespace MQTTnet.Formatter.V5
 {
     public sealed class MqttV5PacketEncoder
     {
+        const int FixedHeaderSize = 1;
+        
         readonly MqttBufferWriter _bufferWriter;
         readonly MqttV5PropertiesWriter _propertiesWriter = new MqttV5PropertiesWriter(new MqttBufferWriter(1024, 4096));
 
@@ -35,14 +37,16 @@ namespace MQTTnet.Formatter.V5
             var remainingLength = (uint)_bufferWriter.Length - 5;
 
             var publishPacket = packet as MqttPublishPacket;
-            if (publishPacket?.Payload != null)
+            var payloadSegment = publishPacket?.PayloadSegment;
+
+            if (payloadSegment != null)
             {
-                remainingLength += (uint)publishPacket.Payload.Length;
+                remainingLength += (uint)payloadSegment.Value.Count;
             }
 
-            var remainingLengthSize = MqttBufferWriter.GetLengthOfVariableInteger(remainingLength);
+            var remainingLengthSize = MqttBufferWriter.GetVariableByteIntegerSize(remainingLength);
 
-            var headerSize = 1 + remainingLengthSize;
+            var headerSize = FixedHeaderSize + remainingLengthSize;
             var headerOffset = 5 - headerSize;
 
             // Position cursor on correct offset on beginning of array (has leading 0x0)
@@ -51,18 +55,13 @@ namespace MQTTnet.Formatter.V5
             _bufferWriter.WriteVariableByteInteger(remainingLength);
 
             var buffer = _bufferWriter.GetBuffer();
-
             var firstSegment = new ArraySegment<byte>(buffer, headerOffset, _bufferWriter.Length - headerOffset);
 
-            if (publishPacket?.Payload != null)
-            {
-                var payloadSegment = new ArraySegment<byte>(publishPacket.Payload, 0, publishPacket.Payload.Length);
-                return new MqttPacketBuffer(firstSegment, payloadSegment);
-            }
-
-            return new MqttPacketBuffer(firstSegment);
+            return payloadSegment == null
+               ? new MqttPacketBuffer(firstSegment)
+               : new MqttPacketBuffer(firstSegment, payloadSegment.Value);
         }
-        
+
         byte EncodeAuthPacket(MqttAuthPacket packet)
         {
             _bufferWriter.WriteByte((byte)packet.ReasonCode);
@@ -187,7 +186,7 @@ namespace MQTTnet.Formatter.V5
                 _propertiesWriter.Reset();
 
                 _bufferWriter.WriteString(packet.WillTopic);
-                _bufferWriter.WriteBinaryData(packet.WillMessage);
+                _bufferWriter.WriteBinary(packet.WillMessage);
             }
 
             if (packet.Username != null)
@@ -197,7 +196,7 @@ namespace MQTTnet.Formatter.V5
 
             if (packet.Password != null)
             {
-                _bufferWriter.WriteBinaryData(packet.Password);
+                _bufferWriter.WriteBinary(packet.Password);
             }
 
             return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Connect);
@@ -280,7 +279,7 @@ namespace MQTTnet.Formatter.V5
             _propertiesWriter.WriteReasonString(packet.ReasonString);
             _propertiesWriter.WriteUserProperties(packet.UserProperties);
 
-            if (_bufferWriter.Length > 0 || packet.ReasonCode != MqttPubAckReasonCode.Success)
+            if (_propertiesWriter.Length > 0 || packet.ReasonCode != MqttPubAckReasonCode.Success)
             {
                 _bufferWriter.WriteByte((byte)packet.ReasonCode);
                 _propertiesWriter.WriteTo(_bufferWriter);
@@ -376,7 +375,7 @@ namespace MQTTnet.Formatter.V5
 
             _bufferWriter.WriteTwoByteInteger(packet.PacketIdentifier);
 
-            if (_bufferWriter.Length > 0 || packet.ReasonCode != MqttPubRecReasonCode.Success)
+            if (_propertiesWriter.Length > 0 || packet.ReasonCode != MqttPubRecReasonCode.Success)
             {
                 _bufferWriter.WriteByte((byte)packet.ReasonCode);
                 _propertiesWriter.WriteTo(_bufferWriter);
@@ -522,7 +521,7 @@ namespace MQTTnet.Formatter.V5
                 _bufferWriter.WriteString(topicFilter);
             }
 
-            return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Unsubscibe, 0x02);
+            return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Unsubscribe, 0x02);
         }
 
         static void ThrowIfPacketIdentifierIsInvalid(ushort packetIdentifier, MqttPacket packet)

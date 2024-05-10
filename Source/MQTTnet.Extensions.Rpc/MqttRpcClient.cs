@@ -2,24 +2,28 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using MQTTnet.Client;
-using MQTTnet.Exceptions;
-using MQTTnet.Protocol;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MQTTnet.Implementations;
+using MQTTnet.Client;
+using MQTTnet.Exceptions;
+using MQTTnet.Formatter;
+using MQTTnet.Internal;
+using MQTTnet.Protocol;
 
 namespace MQTTnet.Extensions.Rpc
 {
-    public sealed class MqttRpcClient : IDisposable
+    public sealed class MqttRpcClient : IMqttRpcClient
     {
-        readonly ConcurrentDictionary<string, TaskCompletionSource<byte[]>> _waitingCalls = new ConcurrentDictionary<string, TaskCompletionSource<byte[]>>();
-        readonly MqttClient _mqttClient;
+        readonly IMqttClient _mqttClient;
         readonly MqttRpcClientOptions _options;
-        
-        public MqttRpcClient(MqttClient mqttClient, MqttRpcClientOptions options)
+
+        readonly ConcurrentDictionary<string, AsyncTaskCompletionSource<byte[]>> _waitingCalls = new ConcurrentDictionary<string, AsyncTaskCompletionSource<byte[]>>();
+
+        public MqttRpcClient(IMqttClient mqttClient, MqttRpcClientOptions options)
         {
             _mqttClient = mqttClient ?? throw new ArgumentNullException(nameof(mqttClient));
             _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -27,13 +31,25 @@ namespace MQTTnet.Extensions.Rpc
             _mqttClient.ApplicationMessageReceivedAsync += HandleApplicationMessageReceivedAsync;
         }
 
-        public async Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel)
+        public void Dispose()
+        {
+            _mqttClient.ApplicationMessageReceivedAsync -= HandleApplicationMessageReceivedAsync;
+
+            foreach (var tcs in _waitingCalls)
+            {
+                tcs.Value.TrySetCanceled();
+            }
+
+            _waitingCalls.Clear();
+        }
+
+        public async Task<byte[]> ExecuteAsync(TimeSpan timeout, string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel, IDictionary<string, object> parameters = null)
         {
             using (var timeoutToken = new CancellationTokenSource(timeout))
             {
                 try
                 {
-                    return await ExecuteAsync(methodName, payload, qualityOfServiceLevel, timeoutToken.Token).ConfigureAwait(false);
+                    return await ExecuteAsync(methodName, payload, qualityOfServiceLevel, parameters, timeoutToken.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException exception)
                 {
@@ -47,17 +63,15 @@ namespace MQTTnet.Extensions.Rpc
             }
         }
 
-        public async Task<byte[]> ExecuteAsync(string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel, CancellationToken cancellationToken)
+        public async Task<byte[]> ExecuteAsync(string methodName, byte[] payload, MqttQualityOfServiceLevel qualityOfServiceLevel, IDictionary<string, object> parameters = null, CancellationToken cancellationToken = default)
         {
-            if (methodName == null) throw new ArgumentNullException(nameof(methodName));
-            
-            var topicNames = _options.TopicGenerationStrategy.CreateRpcTopics(new TopicGenerationContext
+            if (methodName == null)
             {
-                MethodName = methodName,
-                QualityOfServiceLevel = qualityOfServiceLevel,
-                MqttClient = _mqttClient,
-                Options = _options
-            });
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            var context = new TopicGenerationContext(_mqttClient, _options, methodName, parameters, qualityOfServiceLevel);
+            var topicNames = _options.TopicGenerationStrategy.CreateRpcTopics(context);
 
             var requestTopic = topicNames.RequestTopic;
             var responseTopic = topicNames.ResponseTopic;
@@ -72,34 +86,34 @@ namespace MQTTnet.Extensions.Rpc
                 throw new MqttProtocolViolationException("RPC response topic is empty.");
             }
 
-            var requestMessage = new MqttApplicationMessageBuilder()
-                .WithTopic(requestTopic)
-                .WithPayload(payload)
-                .WithQualityOfServiceLevel(qualityOfServiceLevel)
-                .WithResponseTopic(responseTopic)
-                .Build();
+            var requestMessageBuilder = new MqttApplicationMessageBuilder().WithTopic(requestTopic).WithPayload(payload).WithQualityOfServiceLevel(qualityOfServiceLevel);
+
+            if (_mqttClient.Options.ProtocolVersion == MqttProtocolVersion.V500)
+            {
+                requestMessageBuilder.WithResponseTopic(responseTopic);
+            }
+
+            var requestMessage = requestMessageBuilder.Build();
 
             try
             {
-#if NET452
-                var awaitable = new TaskCompletionSource<byte[]>();
-#else
-                var awaitable = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-#endif
+                var awaitable = new AsyncTaskCompletionSource<byte[]>();
 
                 if (!_waitingCalls.TryAdd(responseTopic, awaitable))
                 {
                     throw new InvalidOperationException();
                 }
 
-                var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-                    .WithTopicFilter(responseTopic, qualityOfServiceLevel)
-                    .Build();
+                var subscribeOptions = new MqttClientSubscribeOptionsBuilder().WithTopicFilter(responseTopic, qualityOfServiceLevel).Build();
 
                 await _mqttClient.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
                 await _mqttClient.PublishAsync(requestMessage, cancellationToken).ConfigureAwait(false);
 
-                using (cancellationToken.Register(() => { awaitable.TrySetCanceled(); }))
+                using (cancellationToken.Register(
+                           () =>
+                           {
+                               awaitable.TrySetCanceled();
+                           }))
                 {
                     return await awaitable.Task.ConfigureAwait(false);
                 }
@@ -107,8 +121,7 @@ namespace MQTTnet.Extensions.Rpc
             finally
             {
                 _waitingCalls.TryRemove(responseTopic, out _);
-                
-                await _mqttClient.UnsubscribeAsync(responseTopic).ConfigureAwait(false);
+                await _mqttClient.UnsubscribeAsync(responseTopic, CancellationToken.None).ConfigureAwait(false);
             }
         }
 
@@ -116,31 +129,16 @@ namespace MQTTnet.Extensions.Rpc
         {
             if (!_waitingCalls.TryRemove(eventArgs.ApplicationMessage.Topic, out var awaitable))
             {
-                return PlatformAbstractionLayer.CompletedTask;
+                return CompletedTask.Instance;
             }
 
-#if NET452
-            Task.Run(() => awaitable.TrySetResult(eventArgs.ApplicationMessage.Payload));
-#else
-            awaitable.TrySetResult(eventArgs.ApplicationMessage.Payload);
-#endif
+            var payloadBuffer = eventArgs.ApplicationMessage.PayloadSegment.ToArray();
+            awaitable.TrySetResult(payloadBuffer);
 
             // Set this message to handled to that other code can avoid execution etc.
             eventArgs.IsHandled = true;
 
-            return PlatformAbstractionLayer.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            _mqttClient.ApplicationMessageReceivedAsync -= HandleApplicationMessageReceivedAsync;
-
-            foreach (var tcs in _waitingCalls)
-            {
-                tcs.Value.TrySetCanceled();
-            }
-
-            _waitingCalls.Clear();
+            return CompletedTask.Instance;
         }
     }
 }

@@ -31,10 +31,14 @@ namespace MQTTnet.Formatter
 
         public MqttProtocolVersion ProtocolVersion { get; private set; } = MqttProtocolVersion.Unknown;
 
+        public void Cleanup()
+        {
+            _bufferWriter.Cleanup();
+        }
+
         public MqttPacket Decode(ReceivedMqttPacket receivedMqttPacket)
         {
             ThrowIfFormatterNotSet();
-
             return _formatter.Decode(receivedMqttPacket);
         }
 
@@ -48,11 +52,6 @@ namespace MQTTnet.Formatter
         {
             ThrowIfFormatterNotSet();
             return _formatter.Encode(packet);
-        }
-
-        public void Cleanup()
-        {
-            _bufferWriter.Cleanup();
         }
 
         public static IMqttPacketFormatter GetMqttPacketFormatter(MqttProtocolVersion protocolVersion, MqttBufferWriter bufferWriter)
@@ -94,6 +93,10 @@ namespace MQTTnet.Formatter
 
             var protocolName = _bufferReader.ReadString();
             var protocolLevel = _bufferReader.ReadByte();
+
+            // Remove the mosquitto try_private flag (MQTT 3.1.1 Bridge).
+            // This flag is accepted but not yet used.
+            protocolLevel &= 0x7F;
 
             if (protocolName == "MQTT")
             {

@@ -4,10 +4,11 @@
 
 using MQTTnet.Client;
 using System;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using MQTTnet.Diagnostics;
-using MQTTnet.Implementations;
+using MQTTnet.Internal;
 using MQTTnet.Protocol;
 
 namespace MQTTnet.TestApp
@@ -27,20 +28,29 @@ namespace MQTTnet.TestApp
                 {
                     ChannelOptions = new MqttClientTcpOptions
                     {
-                        Server = "127.0.0.1"
+                        RemoteEndpoint = new DnsEndPoint("127.0.0.1", 0)
                     }
                 };
 
                 client.ApplicationMessageReceivedAsync += e =>
                 {
+                    var payloadText = string.Empty;
+                    if (e.ApplicationMessage.PayloadSegment.Count > 0)
+                    {
+                        payloadText = Encoding.UTF8.GetString(
+                            e.ApplicationMessage.PayloadSegment.Array,
+                            e.ApplicationMessage.PayloadSegment.Offset,
+                            e.ApplicationMessage.PayloadSegment.Count);
+                    }
+                    
                     Console.WriteLine("### RECEIVED APPLICATION MESSAGE ###");
                     Console.WriteLine($"+ Topic = {e.ApplicationMessage.Topic}");
-                    Console.WriteLine($"+ Payload = {Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}");
+                    Console.WriteLine($"+ Payload = {payloadText}");
                     Console.WriteLine($"+ QoS = {e.ApplicationMessage.QualityOfServiceLevel}");
                     Console.WriteLine($"+ Retain = {e.ApplicationMessage.Retain}");
                     Console.WriteLine();
                     
-                    return PlatformAbstractionLayer.CompletedTask;
+                    return CompletedTask.Instance;
                 };
 
                 client.ConnectedAsync += async e =>

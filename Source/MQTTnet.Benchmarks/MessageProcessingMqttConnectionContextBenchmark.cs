@@ -13,12 +13,12 @@ using MQTTnet.Diagnostics;
 
 namespace MQTTnet.Benchmarks
 {
-    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
+    [SimpleJob(RuntimeMoniker.Net60)]
     [MemoryDiagnoser]
-    public class MessageProcessingMqttConnectionContextBenchmark
+    public class MessageProcessingMqttConnectionContextBenchmark : BaseBenchmark
     {
         IWebHost _host;
-        MqttClient _mqttClient;
+        IMqttClient _mqttClient;
         MqttApplicationMessage _message;
 
         [GlobalSetup]

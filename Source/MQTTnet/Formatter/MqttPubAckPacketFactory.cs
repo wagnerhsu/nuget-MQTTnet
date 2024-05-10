@@ -12,26 +12,28 @@ namespace MQTTnet.Formatter
 {
     public sealed class MqttPubAckPacketFactory
     {
-        public MqttPubAckPacket Create(MqttPublishPacket publishPacket, InterceptingPublishEventArgs interceptingPublishEventArgs)
+        public MqttPubAckPacket Create(
+            MqttPublishPacket publishPacket,
+            DispatchApplicationMessageResult dispatchApplicationMessageResult)
         {
             if (publishPacket == null)
             {
                 throw new ArgumentNullException(nameof(publishPacket));
             }
 
+            if (dispatchApplicationMessageResult == null)
+            {
+                throw new ArgumentNullException(nameof(dispatchApplicationMessageResult));
+            }
+
             var pubAckPacket = new MqttPubAckPacket
             {
                 PacketIdentifier = publishPacket.PacketIdentifier,
-                ReasonCode = MqttPubAckReasonCode.Success
+                ReasonCode = (MqttPubAckReasonCode)dispatchApplicationMessageResult.ReasonCode,
+                ReasonString = dispatchApplicationMessageResult.ReasonString,
+                UserProperties = dispatchApplicationMessageResult.UserProperties
             };
-
-            if (interceptingPublishEventArgs != null)
-            {
-                pubAckPacket.ReasonCode = (MqttPubAckReasonCode)(int)interceptingPublishEventArgs.Response.ReasonCode;
-                pubAckPacket.ReasonString = interceptingPublishEventArgs.Response.ReasonString;
-                pubAckPacket.UserProperties = interceptingPublishEventArgs.Response.UserProperties;
-            }
-
+            
             return pubAckPacket;
         }
 
@@ -42,24 +44,12 @@ namespace MQTTnet.Formatter
                 throw new ArgumentNullException(nameof(applicationMessageReceivedEventArgs));
             }
 
-            var pubAckPacket = Create(applicationMessageReceivedEventArgs.PublishPacket, applicationMessageReceivedEventArgs.ReasonCode);
-            pubAckPacket.UserProperties = applicationMessageReceivedEventArgs.ResponseUserProperties;
-            pubAckPacket.ReasonString = applicationMessageReceivedEventArgs.ResponseReasonString;
-
-            return pubAckPacket;
-        }
-
-        static MqttPubAckPacket Create(MqttPublishPacket publishPacket, MqttApplicationMessageReceivedReasonCode applicationMessageReceivedReasonCode)
-        {
-            if (publishPacket == null)
-            {
-                throw new ArgumentNullException(nameof(publishPacket));
-            }
-
             var pubAckPacket = new MqttPubAckPacket
             {
-                PacketIdentifier = publishPacket.PacketIdentifier,
-                ReasonCode = (MqttPubAckReasonCode)(int)applicationMessageReceivedReasonCode
+                PacketIdentifier = applicationMessageReceivedEventArgs.PublishPacket.PacketIdentifier,
+                ReasonCode = (MqttPubAckReasonCode)(int)applicationMessageReceivedEventArgs.ReasonCode,
+                UserProperties = applicationMessageReceivedEventArgs.ResponseUserProperties,
+                ReasonString = applicationMessageReceivedEventArgs.ResponseReasonString
             };
 
             return pubAckPacket;

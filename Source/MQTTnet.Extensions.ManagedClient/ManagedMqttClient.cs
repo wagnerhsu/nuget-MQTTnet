@@ -14,19 +14,22 @@ using MQTTnet.Internal;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
-using MqttClient = MQTTnet.Client.MqttClient;
 
 namespace MQTTnet.Extensions.ManagedClient
 {
-    public sealed class ManagedMqttClient : Disposable
+    public sealed class ManagedMqttClient : Disposable, IManagedMqttClient
     {
+        readonly MqttNetSourceLogger _logger;
+
+        readonly AsyncEvent<InterceptingPublishMessageEventArgs> _interceptingPublishMessageEvent = new AsyncEvent<InterceptingPublishMessageEventArgs>();
         readonly AsyncEvent<ApplicationMessageProcessedEventArgs> _applicationMessageProcessedEvent = new AsyncEvent<ApplicationMessageProcessedEventArgs>();
+        readonly AsyncEvent<ApplicationMessageSkippedEventArgs> _applicationMessageSkippedEvent = new AsyncEvent<ApplicationMessageSkippedEventArgs>();
         readonly AsyncEvent<ConnectingFailedEventArgs> _connectingFailedEvent = new AsyncEvent<ConnectingFailedEventArgs>();
         readonly AsyncEvent<EventArgs> _connectionStateChangedEvent = new AsyncEvent<EventArgs>();
+        readonly AsyncEvent<ManagedProcessFailedEventArgs> _synchronizingSubscriptionsFailedEvent = new AsyncEvent<ManagedProcessFailedEventArgs>();
+        readonly AsyncEvent<SubscriptionsChangedEventArgs> _subscriptionsChangedEvent = new AsyncEvent<SubscriptionsChangedEventArgs>();
 
-        readonly MqttNetSourceLogger _logger;
         readonly BlockingQueue<ManagedMqttApplicationMessage> _messageQueue = new BlockingQueue<ManagedMqttApplicationMessage>();
-
         readonly AsyncLock _messageQueueLock = new AsyncLock();
 
         /// <summary>
@@ -50,9 +53,9 @@ namespace MQTTnet.Extensions.ManagedClient
         ///         cref="MaintainConnectionAsync" />
         ///     .
         /// </summary>
-        readonly Dictionary<string, MqttQualityOfServiceLevel> _reconnectSubscriptions = new Dictionary<string, MqttQualityOfServiceLevel>();
+        readonly Dictionary<string, MqttTopicFilter> _reconnectSubscriptions = new Dictionary<string, MqttTopicFilter>();
 
-        readonly Dictionary<string, MqttQualityOfServiceLevel> _subscriptions = new Dictionary<string, MqttQualityOfServiceLevel>();
+        readonly Dictionary<string, MqttTopicFilter> _subscriptions = new Dictionary<string, MqttTopicFilter>();
         readonly SemaphoreSlim _subscriptionsQueuedSignal = new SemaphoreSlim(0);
         readonly HashSet<string> _unsubscriptions = new HashSet<string>();
 
@@ -61,8 +64,9 @@ namespace MQTTnet.Extensions.ManagedClient
         CancellationTokenSource _publishingCancellationToken;
 
         ManagedMqttClientStorageManager _storageManager;
+        bool _isCleanDisconnect;
 
-        public ManagedMqttClient(MqttClient mqttClient, IMqttNetLogger logger)
+        public ManagedMqttClient(IMqttClient mqttClient, IMqttNetLogger logger)
         {
             InternalClient = mqttClient ?? throw new ArgumentNullException(nameof(mqttClient));
 
@@ -74,10 +78,22 @@ namespace MQTTnet.Extensions.ManagedClient
             _logger = logger.WithSource(nameof(ManagedMqttClient));
         }
 
+        public event Func<ApplicationMessageSkippedEventArgs, Task> ApplicationMessageSkippedAsync
+        {
+            add => _applicationMessageSkippedEvent.AddHandler(value);
+            remove => _applicationMessageSkippedEvent.RemoveHandler(value);
+        }
+
         public event Func<ApplicationMessageProcessedEventArgs, Task> ApplicationMessageProcessedAsync
         {
             add => _applicationMessageProcessedEvent.AddHandler(value);
             remove => _applicationMessageProcessedEvent.RemoveHandler(value);
+        }
+
+        public event Func<InterceptingPublishMessageEventArgs, Task> InterceptPublishMessageAsync
+        {
+            add => _interceptingPublishMessageEvent.AddHandler(value);
+            remove => _interceptingPublishMessageEvent.RemoveHandler(value);
         }
 
         public event Func<MqttApplicationMessageReceivedEventArgs, Task> ApplicationMessageReceivedAsync
@@ -86,7 +102,7 @@ namespace MQTTnet.Extensions.ManagedClient
             remove => InternalClient.ApplicationMessageReceivedAsync -= value;
         }
 
-        public event Func<EventArgs, Task> ConnectedAsync
+        public event Func<MqttClientConnectedEventArgs, Task> ConnectedAsync
         {
             add => InternalClient.ConnectedAsync += value;
             remove => InternalClient.ConnectedAsync -= value;
@@ -104,15 +120,25 @@ namespace MQTTnet.Extensions.ManagedClient
             remove => _connectionStateChangedEvent.RemoveHandler(value);
         }
 
-        public event Func<EventArgs, Task> DisconnectedAsync
+        public event Func<MqttClientDisconnectedEventArgs, Task> DisconnectedAsync
         {
             add => InternalClient.DisconnectedAsync += value;
             remove => InternalClient.DisconnectedAsync -= value;
         }
 
-        public IApplicationMessageSkippedHandler ApplicationMessageSkippedHandler { get; set; }
+        public event Func<ManagedProcessFailedEventArgs, Task> SynchronizingSubscriptionsFailedAsync
+        {
+            add => _synchronizingSubscriptionsFailedEvent.AddHandler(value);
+            remove => _synchronizingSubscriptionsFailedEvent.RemoveHandler(value);
+        }
 
-        public MqttClient InternalClient { get; }
+        public event Func<SubscriptionsChangedEventArgs, Task> SubscriptionsChangedAsync
+        {
+            add => _subscriptionsChangedEvent.AddHandler(value);
+            remove => _subscriptionsChangedEvent.RemoveHandler(value);
+        }
+
+        public IMqttClient InternalClient { get; }
 
         public bool IsConnected => InternalClient.IsConnected;
 
@@ -121,8 +147,6 @@ namespace MQTTnet.Extensions.ManagedClient
         public ManagedMqttClientOptions Options { get; private set; }
 
         public int PendingApplicationMessagesCount => _messageQueue.Count;
-
-        public ISynchronizingSubscriptionsFailedHandler SynchronizingSubscriptionsFailedHandler { get; set; }
 
         public async Task EnqueueAsync(MqttApplicationMessage applicationMessage)
         {
@@ -151,14 +175,14 @@ namespace MQTTnet.Extensions.ManagedClient
                 throw new InvalidOperationException("call StartAsync before publishing messages");
             }
 
-            MqttTopicValidator.ThrowIfInvalid(applicationMessage.ApplicationMessage.Topic);
+            MqttTopicValidator.ThrowIfInvalid(applicationMessage.ApplicationMessage);
 
             ManagedMqttApplicationMessage removedMessage = null;
             ApplicationMessageSkippedEventArgs applicationMessageSkippedEventArgs = null;
 
             try
             {
-                using (await _messageQueueLock.WaitAsync(CancellationToken.None).ConfigureAwait(false))
+                using (await _messageQueueLock.EnterAsync().ConfigureAwait(false))
                 {
                     if (_messageQueue.Count >= Options.MaxPendingMessages)
                     {
@@ -192,18 +216,14 @@ namespace MQTTnet.Extensions.ManagedClient
             }
             finally
             {
-                if (applicationMessageSkippedEventArgs != null)
+                if (applicationMessageSkippedEventArgs != null && _applicationMessageSkippedEvent.HasHandlers)
                 {
-                    var applicationMessageSkippedHandler = ApplicationMessageSkippedHandler;
-                    if (applicationMessageSkippedHandler != null)
-                    {
-                        await applicationMessageSkippedHandler.HandleApplicationMessageSkippedAsync(applicationMessageSkippedEventArgs).ConfigureAwait(false);
-                    }
+                    await _applicationMessageSkippedEvent.InvokeAsync(applicationMessageSkippedEventArgs).ConfigureAwait(false);
                 }
             }
         }
 
-        public Task PingAsync(CancellationToken cancellationToken)
+        public Task PingAsync(CancellationToken cancellationToken = default)
         {
             return InternalClient.PingAsync(cancellationToken);
         }
@@ -250,9 +270,11 @@ namespace MQTTnet.Extensions.ManagedClient
             _logger.Info("Started");
         }
 
-        public async Task StopAsync()
+        public async Task StopAsync(bool cleanDisconnect = true)
         {
             ThrowIfDisposed();
+
+            _isCleanDisconnect = cleanDisconnect;
 
             StopPublishing();
             StopMaintainingConnection();
@@ -284,14 +306,14 @@ namespace MQTTnet.Extensions.ManagedClient
             {
                 foreach (var topicFilter in topicFilters)
                 {
-                    _subscriptions[topicFilter.Topic] = topicFilter.QualityOfServiceLevel;
+                    _subscriptions[topicFilter.Topic] = topicFilter;
                     _unsubscriptions.Remove(topicFilter.Topic);
                 }
             }
 
             _subscriptionsQueuedSignal.Release();
 
-            return Task.FromResult(0);
+            return CompletedTask.Instance;
         }
 
         public Task UnsubscribeAsync(ICollection<string> topics)
@@ -314,7 +336,7 @@ namespace MQTTnet.Extensions.ManagedClient
 
             _subscriptionsQueuedSignal.Release();
 
-            return Task.FromResult(0);
+            return CompletedTask.Instance;
         }
 
         protected override void Dispose(bool disposing)
@@ -345,14 +367,28 @@ namespace MQTTnet.Extensions.ManagedClient
             return remainingTime < TimeSpan.Zero ? TimeSpan.Zero : remainingTime;
         }
 
-        async Task HandleSubscriptionExceptionAsync(Exception exception)
+        CancellationTokenSource NewTimeoutToken(CancellationToken linkedToken)
+        {
+            var newTimeoutToken = CancellationTokenSource.CreateLinkedTokenSource(linkedToken);
+            newTimeoutToken.CancelAfter(Options.ClientOptions.Timeout);
+            return newTimeoutToken;
+        }
+
+        async Task HandleSubscriptionExceptionAsync(Exception exception, List<MqttTopicFilter> addedSubscriptions, List<string> removedSubscriptions)
         {
             _logger.Warning(exception, "Synchronizing subscriptions failed.");
 
-            var synchronizingSubscriptionsFailedHandler = SynchronizingSubscriptionsFailedHandler;
-            if (SynchronizingSubscriptionsFailedHandler != null)
+            if (_synchronizingSubscriptionsFailedEvent.HasHandlers)
             {
-                await synchronizingSubscriptionsFailedHandler.HandleSynchronizingSubscriptionsFailedAsync(new ManagedProcessFailedEventArgs(exception)).ConfigureAwait(false);
+                await _synchronizingSubscriptionsFailedEvent.InvokeAsync(new ManagedProcessFailedEventArgs(exception, addedSubscriptions, removedSubscriptions)).ConfigureAwait(false);
+            }
+        }
+
+        async Task HandleSubscriptionsResultAsync(SendSubscribeUnsubscribeResult subscribeUnsubscribeResult)
+        {
+            if (_subscriptionsChangedEvent.HasHandlers)
+            {
+                await _subscriptionsChangedEvent.InvokeAsync(new SubscriptionsChangedEventArgs(subscribeUnsubscribeResult.SubscribeResults, subscribeUnsubscribeResult.UnsubscribeResults)).ConfigureAwait(false);
             }
         }
 
@@ -378,9 +414,12 @@ namespace MQTTnet.Extensions.ManagedClient
                 {
                     try
                     {
-                        using (var disconnectTimeout = new CancellationTokenSource(Options.ClientOptions.Timeout))
+                        if (_isCleanDisconnect)
                         {
-                            await InternalClient.DisconnectAsync(new MqttClientDisconnectOptions(), disconnectTimeout.Token).ConfigureAwait(false);
+                            using (var disconnectTimeout = NewTimeoutToken(CancellationToken.None))
+                            {
+                                await InternalClient.DisconnectAsync(new MqttClientDisconnectOptions(), disconnectTimeout.Token).ConfigureAwait(false);
+                            }
                         }
                     }
                     catch (OperationCanceledException)
@@ -427,7 +466,7 @@ namespace MQTTnet.Extensions.ManagedClient
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await TryPublishQueuedMessageAsync(message).ConfigureAwait(false);
+                    await TryPublishQueuedMessageAsync(message, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -443,40 +482,38 @@ namespace MQTTnet.Extensions.ManagedClient
             }
         }
 
-        async Task PublishReconnectSubscriptionsAsync()
+        async Task PublishReconnectSubscriptionsAsync(CancellationToken cancellationToken)
         {
             _logger.Info("Publishing subscriptions at reconnect");
+
+            List<MqttTopicFilter> topicFilters = null;
 
             try
             {
                 if (_reconnectSubscriptions.Any())
                 {
-                    var subscriptions = _reconnectSubscriptions.Select(
-                        i => new MqttTopicFilter
-                        {
-                            Topic = i.Key,
-                            QualityOfServiceLevel = i.Value
-                        });
+                    topicFilters = new List<MqttTopicFilter>();
+                    SendSubscribeUnsubscribeResult subscribeUnsubscribeResult;
 
-                    var topicFilters = new List<MqttTopicFilter>();
-
-                    foreach (var sub in subscriptions)
+                    foreach (var sub in _reconnectSubscriptions)
                     {
-                        topicFilters.Add(sub);
+                        topicFilters.Add(sub.Value);
 
                         if (topicFilters.Count == Options.MaxTopicFiltersInSubscribeUnsubscribePackets)
                         {
-                            await SendSubscribeUnsubscribe(topicFilters, null).ConfigureAwait(false);
+                            subscribeUnsubscribeResult = await SendSubscribeUnsubscribe(topicFilters, null, cancellationToken).ConfigureAwait(false);
                             topicFilters.Clear();
+                            await HandleSubscriptionsResultAsync(subscribeUnsubscribeResult).ConfigureAwait(false);
                         }
                     }
 
-                    await SendSubscribeUnsubscribe(topicFilters, null).ConfigureAwait(false);
+                    subscribeUnsubscribeResult = await SendSubscribeUnsubscribe(topicFilters, null, cancellationToken).ConfigureAwait(false);
+                    await HandleSubscriptionsResultAsync(subscribeUnsubscribeResult).ConfigureAwait(false);
                 }
             }
             catch (Exception exception)
             {
-                await HandleSubscriptionExceptionAsync(exception).ConfigureAwait(false);
+                await HandleSubscriptionExceptionAsync(exception, topicFilters, null).ConfigureAwait(false);
             }
         }
 
@@ -487,18 +524,12 @@ namespace MQTTnet.Extensions.ManagedClient
             while (await _subscriptionsQueuedSignal.WaitAsync(GetRemainingTime(endTime), cancellationToken).ConfigureAwait(false))
             {
                 List<MqttTopicFilter> subscriptions;
+                SendSubscribeUnsubscribeResult subscribeUnsubscribeResult;
                 HashSet<string> unsubscriptions;
 
                 lock (_subscriptions)
                 {
-                    subscriptions = _subscriptions.Select(
-                            i => new MqttTopicFilter
-                            {
-                                Topic = i.Key,
-                                QualityOfServiceLevel = i.Value
-                            })
-                        .ToList();
-
+                    subscriptions = _subscriptions.Values.ToList();
                     _subscriptions.Clear();
 
                     unsubscriptions = new HashSet<string>(_unsubscriptions);
@@ -519,7 +550,7 @@ namespace MQTTnet.Extensions.ManagedClient
 
                 foreach (var subscription in subscriptions)
                 {
-                    _reconnectSubscriptions[subscription.Topic] = subscription.QualityOfServiceLevel;
+                    _reconnectSubscriptions[subscription.Topic] = subscription;
                 }
 
                 var addedTopicFilters = new List<MqttTopicFilter>();
@@ -529,12 +560,14 @@ namespace MQTTnet.Extensions.ManagedClient
 
                     if (addedTopicFilters.Count == Options.MaxTopicFiltersInSubscribeUnsubscribePackets)
                     {
-                        await SendSubscribeUnsubscribe(addedTopicFilters, null).ConfigureAwait(false);
+                        subscribeUnsubscribeResult = await SendSubscribeUnsubscribe(addedTopicFilters, null, cancellationToken).ConfigureAwait(false);
                         addedTopicFilters.Clear();
+                        await HandleSubscriptionsResultAsync(subscribeUnsubscribeResult).ConfigureAwait(false);
                     }
                 }
 
-                await SendSubscribeUnsubscribe(addedTopicFilters, null).ConfigureAwait(false);
+                subscribeUnsubscribeResult = await SendSubscribeUnsubscribe(addedTopicFilters, null, cancellationToken).ConfigureAwait(false);
+                await HandleSubscriptionsResultAsync(subscribeUnsubscribeResult).ConfigureAwait(false);
 
                 var removedTopicFilters = new List<string>();
                 foreach (var unSub in unsubscriptions)
@@ -543,12 +576,14 @@ namespace MQTTnet.Extensions.ManagedClient
 
                     if (removedTopicFilters.Count == Options.MaxTopicFiltersInSubscribeUnsubscribePackets)
                     {
-                        await SendSubscribeUnsubscribe(null, removedTopicFilters).ConfigureAwait(false);
+                        subscribeUnsubscribeResult = await SendSubscribeUnsubscribe(null, removedTopicFilters, cancellationToken).ConfigureAwait(false);
                         removedTopicFilters.Clear();
+                        await HandleSubscriptionsResultAsync(subscribeUnsubscribeResult).ConfigureAwait(false);
                     }
                 }
 
-                await SendSubscribeUnsubscribe(null, removedTopicFilters).ConfigureAwait(false);
+                subscribeUnsubscribeResult = await SendSubscribeUnsubscribe(null, removedTopicFilters, cancellationToken).ConfigureAwait(false);
+                await HandleSubscriptionsResultAsync(subscribeUnsubscribeResult).ConfigureAwait(false);
             }
         }
 
@@ -562,7 +597,7 @@ namespace MQTTnet.Extensions.ManagedClient
             MqttClientConnectResult connectResult = null;
             try
             {
-                using (var connectTimeout = new CancellationTokenSource(Options.ClientOptions.Timeout))
+                using (var connectTimeout = NewTimeoutToken(cancellationToken))
                 {
                     connectResult = await InternalClient.ConnectAsync(Options.ClientOptions, connectTimeout.Token).ConfigureAwait(false);
                 }
@@ -581,8 +616,10 @@ namespace MQTTnet.Extensions.ManagedClient
             }
         }
 
-        async Task SendSubscribeUnsubscribe(List<MqttTopicFilter> addedSubscriptions, List<string> removedSubscriptions)
+        async Task<SendSubscribeUnsubscribeResult> SendSubscribeUnsubscribe(List<MqttTopicFilter> addedSubscriptions, List<string> removedSubscriptions, CancellationToken cancellationToken)
         {
+            var subscribeResults = new List<MqttClientSubscribeResult>();
+            var unsubscribeResults = new List<MqttClientUnsubscribeResult>();
             try
             {
                 if (removedSubscriptions != null && removedSubscriptions.Any())
@@ -594,7 +631,14 @@ namespace MQTTnet.Extensions.ManagedClient
                         unsubscribeOptionsBuilder.WithTopicFilter(removedSubscription);
                     }
 
-                    await InternalClient.UnsubscribeAsync(unsubscribeOptionsBuilder.Build()).ConfigureAwait(false);
+                    using (var unsubscribeTimeout = NewTimeoutToken(cancellationToken))
+                    {
+                        var unsubscribeResult = await InternalClient.UnsubscribeAsync(unsubscribeOptionsBuilder.Build(), unsubscribeTimeout.Token).ConfigureAwait(false);
+                        unsubscribeResults.Add(unsubscribeResult);
+                    }
+
+                    //clear because these worked, maybe the subscribe below will fail, only report those
+                    removedSubscriptions.Clear();
                 }
 
                 if (addedSubscriptions != null && addedSubscriptions.Any())
@@ -606,13 +650,19 @@ namespace MQTTnet.Extensions.ManagedClient
                         subscribeOptionsBuilder.WithTopicFilter(addedSubscription);
                     }
 
-                    await InternalClient.SubscribeAsync(subscribeOptionsBuilder.Build()).ConfigureAwait(false);
+                    using (var subscribeTimeout = NewTimeoutToken(cancellationToken))
+                    {
+                        var subscribeResult = await InternalClient.SubscribeAsync(subscribeOptionsBuilder.Build(), subscribeTimeout.Token).ConfigureAwait(false);
+                        subscribeResults.Add(subscribeResult);
+                    }
                 }
             }
             catch (Exception exception)
             {
-                await HandleSubscriptionExceptionAsync(exception).ConfigureAwait(false);
+                await HandleSubscriptionExceptionAsync(exception, addedSubscriptions, removedSubscriptions).ConfigureAwait(false);
             }
+
+            return new SendSubscribeUnsubscribeResult(subscribeResults, unsubscribeResults);
         }
 
         void StartPublishing()
@@ -658,7 +708,7 @@ namespace MQTTnet.Extensions.ManagedClient
             {
                 var oldConnectionState = InternalClient.IsConnected;
                 var connectionState = await ReconnectIfRequiredAsync(cancellationToken).ConfigureAwait(false);
-                
+
                 if (connectionState == ReconnectionResult.NotConnected)
                 {
                     StopPublishing();
@@ -666,7 +716,7 @@ namespace MQTTnet.Extensions.ManagedClient
                 }
                 else if (connectionState == ReconnectionResult.Reconnected)
                 {
-                    await PublishReconnectSubscriptionsAsync().ConfigureAwait(false);
+                    await PublishReconnectSubscriptionsAsync(cancellationToken).ConfigureAwait(false);
                     StartPublishing();
                 }
                 else if (connectionState == ReconnectionResult.Recovered)
@@ -696,14 +746,28 @@ namespace MQTTnet.Extensions.ManagedClient
             }
         }
 
-        async Task TryPublishQueuedMessageAsync(ManagedMqttApplicationMessage message)
+        async Task TryPublishQueuedMessageAsync(ManagedMqttApplicationMessage message, CancellationToken cancellationToken)
         {
             Exception transmitException = null;
+            bool acceptPublish = true;
             try
             {
-                await InternalClient.PublishAsync(message.ApplicationMessage).ConfigureAwait(false);
+                if (_interceptingPublishMessageEvent.HasHandlers)
+                {
+                    var interceptEventArgs = new InterceptingPublishMessageEventArgs(message);
+                    await _interceptingPublishMessageEvent.InvokeAsync(interceptEventArgs).ConfigureAwait(false);
+                    acceptPublish = interceptEventArgs.AcceptPublish;
+                }
 
-                using (await _messageQueueLock.WaitAsync(CancellationToken.None).ConfigureAwait(false)) //lock to avoid conflict with this.PublishAsync
+                if (acceptPublish)
+                {
+                    using (var publishTimeout = NewTimeoutToken(cancellationToken))
+                    {
+                        await InternalClient.PublishAsync(message.ApplicationMessage, publishTimeout.Token).ConfigureAwait(false);
+                    }
+                }
+
+                using (await _messageQueueLock.EnterAsync().ConfigureAwait(false)) //lock to avoid conflict with this.PublishAsync
                 {
                     // While publishing this message, this.PublishAsync could have booted this
                     // message off the queue to make room for another (when using a cap
@@ -734,7 +798,7 @@ namespace MQTTnet.Extensions.ManagedClient
                     //contradict the expected behavior of QoS 1 and 2, that's also true
                     //for the usage of a message queue cap, so it's still consistent
                     //with prior behavior in that way.
-                    using (await _messageQueueLock.WaitAsync(CancellationToken.None).ConfigureAwait(false)) //lock to avoid conflict with this.PublishAsync
+                    using (await _messageQueueLock.EnterAsync().ConfigureAwait(false)) //lock to avoid conflict with this.PublishAsync
                     {
                         _messageQueue.RemoveFirst(i => i.Id.Equals(message.Id));
 

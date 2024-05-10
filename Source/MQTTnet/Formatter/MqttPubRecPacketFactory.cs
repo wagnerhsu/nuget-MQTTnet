@@ -25,7 +25,7 @@ namespace MQTTnet.Formatter
             return pubRecPacket;
         }
 
-        public MqttPacket Create(MqttPublishPacket publishPacket, InterceptingPublishEventArgs interceptingPublishEventArgs)
+        public MqttPacket Create(MqttPublishPacket publishPacket, DispatchApplicationMessageResult dispatchApplicationMessageResult)
         {
             if (publishPacket == null)
             {
@@ -35,15 +35,10 @@ namespace MQTTnet.Formatter
             var pubRecPacket = new MqttPubRecPacket
             {
                 PacketIdentifier = publishPacket.PacketIdentifier,
-                ReasonCode = MqttPubRecReasonCode.Success
+                ReasonCode = (MqttPubRecReasonCode)dispatchApplicationMessageResult.ReasonCode,
+                ReasonString = dispatchApplicationMessageResult.ReasonString,
+                UserProperties = dispatchApplicationMessageResult.UserProperties
             };
-
-            if (interceptingPublishEventArgs != null)
-            {
-                pubRecPacket.ReasonCode = (MqttPubRecReasonCode)(int)interceptingPublishEventArgs.Response.ReasonCode;
-                pubRecPacket.ReasonString = interceptingPublishEventArgs.Response.ReasonString;
-                pubRecPacket.UserProperties = interceptingPublishEventArgs.Response.UserProperties;
-            }
 
             return pubRecPacket;
         }

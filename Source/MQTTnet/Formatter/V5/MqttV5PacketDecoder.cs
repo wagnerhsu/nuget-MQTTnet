@@ -54,7 +54,7 @@ namespace MQTTnet.Formatter.V5
                     return DecodeSubscribePacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.SubAck:
                     return DecodeSubAckPacket(receivedMqttPacket.Body);
-                case MqttControlPacketType.Unsubscibe:
+                case MqttControlPacketType.Unsubscribe:
                     return DecodeUnsubscribePacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.UnsubAck:
                     return DecodeUnsubAckPacket(receivedMqttPacket.Body);
@@ -129,6 +129,9 @@ namespace MQTTnet.Formatter.V5
                 // Absence indicates max QoS level.
                 MaximumQoS = MqttQualityOfServiceLevel.ExactlyOnce
             };
+
+            // Also set the return code of MQTT 3.1.1 for backward compatibility and debugging purposes.
+            packet.ReturnCode = MqttConnectReasonCodeConverter.ToConnectReturnCode(packet.ReasonCode);
 
             var propertiesReader = new MqttV5PropertiesReader(_bufferReader);
             while (propertiesReader.MoveNext())
@@ -528,7 +531,7 @@ namespace MQTTnet.Formatter.V5
 
             if (!_bufferReader.EndOfStream)
             {
-                packet.Payload = _bufferReader.ReadRemainingData();
+                packet.PayloadSegment = new ArraySegment<byte>(_bufferReader.ReadRemainingData());
             }
 
             return packet;

@@ -4,7 +4,7 @@
 
 namespace MQTTnet.Client
 {
-    public class MqttClientWebSocketProxyOptions
+    public sealed class MqttClientWebSocketProxyOptions
     {
         public string Address { get; set; }
 
@@ -15,6 +15,8 @@ namespace MQTTnet.Client
         public string Domain { get; set; }
 
         public bool BypassOnLocal { get; set; }
+
+        public bool UseDefaultCredentials { get; set; }
 
         public string[] BypassList { get; set; }
     }

@@ -54,12 +54,12 @@ namespace MQTTnet.Formatter.V3
                     return DecodePubRelPacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.PubComp:
                     return DecodePubCompPacket(receivedMqttPacket.Body);
-                
+
                 case MqttControlPacketType.PingReq:
                     return MqttPingReqPacket.Instance;
                 case MqttControlPacketType.PingResp:
                     return MqttPingRespPacket.Instance;
-                
+
                 case MqttControlPacketType.Connect:
                     return DecodeConnectPacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.ConnAck:
@@ -73,12 +73,12 @@ namespace MQTTnet.Formatter.V3
                     }
                 case MqttControlPacketType.Disconnect:
                     return DisconnectPacket;
-                
+
                 case MqttControlPacketType.Subscribe:
                     return DecodeSubscribePacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.SubAck:
                     return DecodeSubAckPacket(receivedMqttPacket.Body);
-                case MqttControlPacketType.Unsubscibe:
+                case MqttControlPacketType.Unsubscribe:
                     return DecodeUnsubscribePacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.UnsubAck:
                     return DecodeUnsubAckPacket(receivedMqttPacket.Body);
@@ -103,12 +103,13 @@ namespace MQTTnet.Formatter.V3
             var remainingLength = (uint)(_bufferWriter.Length - 5);
 
             var publishPacket = packet as MqttPublishPacket;
-            if (publishPacket?.Payload != null)
+            var payloadSegment = publishPacket?.PayloadSegment;
+            if (payloadSegment != null)
             {
-                remainingLength += (uint)publishPacket.Payload.Length;
+                remainingLength += (uint)payloadSegment.Value.Count;
             }
 
-            var remainingLengthSize = MqttBufferWriter.GetLengthOfVariableInteger(remainingLength);
+            var remainingLengthSize = MqttBufferWriter.GetVariableByteIntegerSize(remainingLength);
 
             var headerSize = FixedHeaderSize + remainingLengthSize;
             var headerOffset = 5 - headerSize;
@@ -119,18 +120,13 @@ namespace MQTTnet.Formatter.V3
             _bufferWriter.WriteVariableByteInteger(remainingLength);
 
             var buffer = _bufferWriter.GetBuffer();
-
             var firstSegment = new ArraySegment<byte>(buffer, headerOffset, _bufferWriter.Length - headerOffset);
 
-            if (publishPacket?.Payload != null)
-            {
-                var payloadSegment = new ArraySegment<byte>(publishPacket.Payload, 0, publishPacket.Payload.Length);
-                return new MqttPacketBuffer(firstSegment, payloadSegment);
-            }
-
-            return new MqttPacketBuffer(firstSegment);
+            return payloadSegment == null
+                ? new MqttPacketBuffer(firstSegment)
+                : new MqttPacketBuffer(firstSegment, payloadSegment.Value);
         }
-        
+
         MqttPacket DecodeConnAckPacket(ArraySegment<byte> body)
         {
             ThrowIfBodyIsEmpty(body);
@@ -175,12 +171,18 @@ namespace MQTTnet.Formatter.V3
                 throw new MqttProtocolViolationException("MQTT protocol name do not match MQTT v3.");
             }
 
+            var tryPrivate = (protocolVersion & 0x80) > 0;
+            protocolVersion &= 0x7F;
+
             if (protocolVersion != 3 && protocolVersion != 4)
             {
                 throw new MqttProtocolViolationException("MQTT protocol version do not match MQTT v3.");
             }
 
-            var packet = new MqttConnectPacket();
+            var packet = new MqttConnectPacket
+            {
+                TryPrivate = tryPrivate
+            };
 
             var connectFlags = _bufferReader.ReadByte();
             if ((connectFlags & 0x1) > 0)
@@ -276,7 +278,7 @@ namespace MQTTnet.Formatter.V3
 
             if (!_bufferReader.EndOfStream)
             {
-                packet.Payload = _bufferReader.ReadRemainingData();
+                packet.PayloadSegment = new ArraySegment<byte>(_bufferReader.ReadRemainingData());
             }
 
             return packet;
@@ -409,7 +411,14 @@ namespace MQTTnet.Formatter.V3
             ValidateConnectPacket(packet);
 
             bufferWriter.WriteString("MQIsdp");
-            bufferWriter.WriteByte(3); // Protocol Level 3
+
+            var protocolVersion = 3;
+            if (packet.TryPrivate)
+            {
+                protocolVersion |= 0x80;
+            }
+
+            bufferWriter.WriteByte((byte)protocolVersion);
 
             byte connectFlags = 0x0;
             if (packet.CleanSession)
@@ -450,7 +459,7 @@ namespace MQTTnet.Formatter.V3
             if (packet.WillFlag)
             {
                 bufferWriter.WriteString(packet.WillTopic);
-                bufferWriter.WriteBinaryData(packet.WillMessage);
+                bufferWriter.WriteBinary(packet.WillMessage);
             }
 
             if (packet.Username != null)
@@ -460,7 +469,7 @@ namespace MQTTnet.Formatter.V3
 
             if (packet.Password != null)
             {
-                bufferWriter.WriteBinaryData(packet.Password);
+                bufferWriter.WriteBinary(packet.Password);
             }
 
             return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Connect);
@@ -512,7 +521,7 @@ namespace MQTTnet.Formatter.V3
             if (packet.WillFlag)
             {
                 bufferWriter.WriteString(packet.WillTopic);
-                bufferWriter.WriteBinaryData(packet.WillMessage);
+                bufferWriter.WriteBinary(packet.WillMessage);
             }
 
             if (packet.Username != null)
@@ -522,7 +531,7 @@ namespace MQTTnet.Formatter.V3
 
             if (packet.Password != null)
             {
-                bufferWriter.WriteBinaryData(packet.Password);
+                bufferWriter.WriteBinary(packet.Password);
             }
 
             return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Connect);
@@ -770,7 +779,7 @@ namespace MQTTnet.Formatter.V3
                 }
             }
 
-            return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Unsubscibe, 0x02);
+            return MqttBufferWriter.BuildFixedHeader(MqttControlPacketType.Unsubscribe, 0x02);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

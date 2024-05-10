@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 using System.IO;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Net;
 using MQTTnet.Client;
 using MQTTnet.Extensions.ManagedClient;
-using MQTTnet.Implementations;
+using MQTTnet.Internal;
 using MQTTnet.Protocol;
 
 namespace MQTTnet.TestApp
@@ -28,7 +29,7 @@ namespace MQTTnet.TestApp
                     Credentials = new RandomPassword(),
                     ChannelOptions = new MqttClientTcpOptions
                     {
-                        Server = "broker.hivemq.com"
+                        RemoteEndpoint = new DnsEndPoint("broker.hivemq.com", 0)
                     }
                 },
 
@@ -42,7 +43,7 @@ namespace MQTTnet.TestApp
                 managedClient.ApplicationMessageReceivedAsync += e =>
                 {
                     Console.WriteLine(">> RECEIVED: " + e.ApplicationMessage.Topic);
-                    return PlatformAbstractionLayer.CompletedTask;
+                    return CompletedTask.Instance;
                 };
 
                 await managedClient.StartAsync(options);
@@ -85,7 +86,7 @@ namespace MQTTnet.TestApp
             public Task SaveQueuedMessagesAsync(IList<ManagedMqttApplicationMessage> messages)
             {
                 File.WriteAllText(Filename, JsonConvert.SerializeObject(messages));
-                return Task.FromResult(0);
+                return CompletedTask.Instance;
             }
 
             public Task<IList<ManagedMqttApplicationMessage>> LoadQueuedMessagesAsync()

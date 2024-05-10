@@ -3,7 +3,6 @@ using System.Threading;
 using MQTTnet.Adapter;
 using MQTTnet.Diagnostics;
 using MQTTnet.Formatter;
-using MQTTnet.Internal;
 using MQTTnet.Packets;
 using MQTTnet.Tests.Mockups;
 
@@ -28,11 +27,11 @@ namespace MQTTnet.Tests
 
         public MqttPacket Decode(MqttPacketBuffer buffer)
         {
-            using (var channel = new TestMqttChannel(buffer.ToArray()))
+            using (var channel = new MemoryMqttChannel(buffer.ToArray()))
             {
                 var formatterAdapter = new MqttPacketFormatterAdapter(_protocolVersion, new MqttBufferWriter(4096, 65535));
 
-                var adapter = new MqttChannelAdapter(channel, formatterAdapter, null, MqttNetNullLogger.Instance);
+                var adapter = new MqttChannelAdapter(channel, formatterAdapter, MqttNetNullLogger.Instance);
                 return adapter.ReceivePacketAsync(CancellationToken.None).GetAwaiter().GetResult();
             }
         }

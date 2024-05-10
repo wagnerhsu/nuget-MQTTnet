@@ -2,7 +2,9 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MQTTnet.Exceptions;
@@ -10,7 +12,7 @@ using MQTTnet.Formatter;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 
-namespace MQTTnet.Tests
+namespace MQTTnet.Tests.Formatter
 {
     [TestClass]
     public sealed class MqttPacketSerialization_V3_Tests
@@ -76,7 +78,7 @@ namespace MQTTnet.Tests
             Assert.IsNull(deserialized.UserProperties); // Not supported in v3.1.1
         }
         
-                [TestMethod]
+        [TestMethod]
         public void Serialize_Full_MqttConnAckPacket_V310()
         {
             var connAckPacket = new MqttConnAckPacket
@@ -204,7 +206,7 @@ namespace MQTTnet.Tests
         {
             var disconnectPacket = new MqttDisconnectPacket
             {
-                ReasonCode = MqttDisconnectReasonCode.NormalDisconnection,
+                ReasonCode = MqttDisconnectReasonCode.NormalDisconnection, // MQTTv3 has no other values than this.
                 ReasonString = "ReasonString",
                 ServerReference = "ServerReference",
                 SessionExpiryInterval = 234,
@@ -216,7 +218,6 @@ namespace MQTTnet.Tests
 
             var deserialized = MqttPacketSerializationHelper.EncodeAndDecodePacket(disconnectPacket, MqttProtocolVersion.V311);
 
-            
             Assert.AreEqual(disconnectPacket.ReasonCode, deserialized.ReasonCode);
             Assert.AreEqual(null, deserialized.ReasonString); // Not supported in v3.1.1
             Assert.AreEqual(null, deserialized.ServerReference); // Not supported in v3.1.1
@@ -297,7 +298,7 @@ namespace MQTTnet.Tests
                 PacketIdentifier = 123,
                 Dup = true,
                 Retain = true,
-                Payload = Encoding.ASCII.GetBytes("Payload"),
+                PayloadSegment = new ArraySegment<byte>(Encoding.ASCII.GetBytes("Payload")),
                 QualityOfServiceLevel = MqttQualityOfServiceLevel.AtLeastOnce,
                 Topic = "Topic",
                 ResponseTopic = "/Response",
@@ -321,7 +322,7 @@ namespace MQTTnet.Tests
             Assert.AreEqual(publishPacket.PacketIdentifier, deserialized.PacketIdentifier);
             Assert.AreEqual(publishPacket.Dup, deserialized.Dup);
             Assert.AreEqual(publishPacket.Retain, deserialized.Retain);
-            CollectionAssert.AreEqual(publishPacket.Payload, deserialized.Payload);
+            CollectionAssert.AreEqual(publishPacket.PayloadSegment.ToArray(), deserialized.PayloadSegment.ToArray());
             Assert.AreEqual(publishPacket.QualityOfServiceLevel, deserialized.QualityOfServiceLevel);
             Assert.AreEqual(publishPacket.Topic, deserialized.Topic);
             Assert.AreEqual(null, deserialized.ResponseTopic); // Not supported in v3.1.1.

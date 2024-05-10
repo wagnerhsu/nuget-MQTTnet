@@ -13,13 +13,12 @@ using MQTTnet.Adapter;
 using MQTTnet.Diagnostics;
 using MQTTnet.Exceptions;
 using MQTTnet.Formatter;
-using MQTTnet.Internal;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
-using MQTTnet.Tests.Extensions;
+using MQTTnet.Tests.Helpers;
 using MQTTnet.Tests.Mockups;
 
-namespace MQTTnet.Tests
+namespace MQTTnet.Tests.Formatter
 {
     [TestClass]
     public sealed class MqttPacketSerialization_V3_Binary_Tests
@@ -112,7 +111,7 @@ namespace MQTTnet.Tests
                 PacketIdentifier = 123,
                 Dup = true,
                 Retain = true,
-                Payload = Encoding.ASCII.GetBytes("HELLO"),
+                PayloadSegment = new ArraySegment<byte>(Encoding.ASCII.GetBytes("HELLO")),
                 QualityOfServiceLevel = MqttQualityOfServiceLevel.AtLeastOnce,
                 Topic = "A/B/C"
             };
@@ -319,9 +318,8 @@ namespace MQTTnet.Tests
             var publishPacket = new MqttPublishPacket
             {
                 Topic = "abcdefghijklmnopqrstuvwxyz0123456789",
-                Payload = payload
+                PayloadSegment = new ArraySegment<byte>(payload)
             };
-
 
             var serializationHelper = new MqttPacketSerializationHelper();
 
@@ -330,17 +328,17 @@ namespace MQTTnet.Tests
 
             Assert.IsNotNull(publishPacketCopy);
             Assert.AreEqual(publishPacket.Topic, publishPacketCopy.Topic);
-            CollectionAssert.AreEqual(publishPacket.Payload, publishPacketCopy.Payload);
+            CollectionAssert.AreEqual(publishPacket.PayloadSegment.ToArray(), publishPacketCopy.PayloadSegment.ToArray());
 
             // Now modify the payload and test again.
-            publishPacket.Payload = Encoding.UTF8.GetBytes("MQTT");
+            publishPacket.PayloadSegment = new ArraySegment<byte>(Encoding.UTF8.GetBytes("MQTT"));
 
             buffer = serializationHelper.Encode(publishPacket);
             var publishPacketCopy2 = serializationHelper.Decode(buffer) as MqttPublishPacket;
 
             Assert.IsNotNull(publishPacketCopy2);
             Assert.AreEqual(publishPacket.Topic, publishPacketCopy2.Topic);
-            CollectionAssert.AreEqual(publishPacket.Payload, publishPacketCopy2.Payload);
+            CollectionAssert.AreEqual(publishPacket.PayloadSegment.ToArray(), publishPacketCopy2.PayloadSegment.ToArray());
         }
 
         [TestMethod]
@@ -464,7 +462,7 @@ namespace MQTTnet.Tests
                 PacketIdentifier = 123,
                 Dup = true,
                 Retain = true,
-                Payload = Encoding.ASCII.GetBytes("HELLO"),
+                PayloadSegment = new ArraySegment<byte>(Encoding.ASCII.GetBytes("HELLO")),
                 QualityOfServiceLevel = MqttQualityOfServiceLevel.AtLeastOnce,
                 Topic = "A/B/C"
             };
@@ -563,12 +561,11 @@ namespace MQTTnet.Tests
 
             using (var headerStream = new MemoryStream(buffer1.Join().ToArray()))
             {
-                using (var channel = new TestMqttChannel(headerStream))
+                using (var channel = new MemoryMqttChannel(headerStream))
                 {
                     using (var adapter = new MqttChannelAdapter(
                                channel,
                                new MqttPacketFormatterAdapter(protocolVersion, new MqttBufferWriter(4096, 65535)),
-                               null,
                                new MqttNetEventLogger()))
                     {
                         var receivedPacket = adapter.ReceivePacketAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -583,18 +580,11 @@ namespace MQTTnet.Tests
 
         MqttProtocolVersion DeserializeAndDetectVersion(MqttPacketFormatterAdapter packetFormatterAdapter, byte[] buffer)
         {
-            var channel = new TestMqttChannel(buffer);
-            var adapter = new MqttChannelAdapter(channel, packetFormatterAdapter, null, new MqttNetEventLogger());
+            var channel = new MemoryMqttChannel(buffer);
+            var adapter = new MqttChannelAdapter(channel, packetFormatterAdapter, new MqttNetEventLogger());
 
             adapter.ReceivePacketAsync(CancellationToken.None).GetAwaiter().GetResult();
             return packetFormatterAdapter.ProtocolVersion;
-        }
-
-        MqttBufferReader ReaderFactory(byte[] data)
-        {
-            var reader = new MqttBufferReader();
-            reader.SetBuffer(data, 0, data.Length);
-            return reader;
         }
 
         TPacket Roundtrip<TPacket>(TPacket packet, MqttProtocolVersion protocolVersion = MqttProtocolVersion.V311, MqttBufferWriter bufferWriter = null) where TPacket : MqttPacket
@@ -603,9 +593,9 @@ namespace MQTTnet.Tests
             var serializer = MqttPacketFormatterAdapter.GetMqttPacketFormatter(protocolVersion, writer);
             var buffer = serializer.Encode(packet);
 
-            using (var channel = new TestMqttChannel(buffer.Join().ToArray()))
+            using (var channel = new MemoryMqttChannel(buffer.Join().ToArray()))
             {
-                var adapter = new MqttChannelAdapter(channel, new MqttPacketFormatterAdapter(protocolVersion, new MqttBufferWriter(4096, 65535)), null, new MqttNetEventLogger());
+                var adapter = new MqttChannelAdapter(channel, new MqttPacketFormatterAdapter(protocolVersion, new MqttBufferWriter(4096, 65535)), new MqttNetEventLogger());
                 return (TPacket)adapter.ReceivePacketAsync(CancellationToken.None).GetAwaiter().GetResult();
             }
         }

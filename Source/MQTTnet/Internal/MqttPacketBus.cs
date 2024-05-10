@@ -20,12 +20,12 @@ namespace MQTTnet.Internal
             new LinkedList<MqttPacketBusItem>()
         };
 
-        readonly SemaphoreSlim _semaphore = new SemaphoreSlim(0);
+        readonly AsyncSignal _signal = new AsyncSignal();
         readonly object _syncRoot = new object();
 
         int _activePartition = (int)MqttPacketBusPartition.Health;
 
-        public int ItemsCount
+        public int TotalItemsCount
         {
             get
             {
@@ -55,12 +55,26 @@ namespace MQTTnet.Internal
                 {
                     for (var i = 0; i < 3; i++)
                     {
+                        // Iterate through the partitions in order to ensure processing of health packets
+                        // even if lots of data packets are enqueued.
+
+                        // Partition | Messages (left = oldest).
+                        // DATA      | [#]#########################
+                        // CONTROL   | [#]#############
+                        // HEALTH    | [#]####
+
+                        // In this sample the 3 oldest messages from the partitions are processed in a row.
+                        // Then the next 3 from all 3 partitions.
+
                         MoveActivePartition();
 
-                        if (_partitions[_activePartition].Count > 0)
+                        var activePartition = _partitions[_activePartition];
+
+                        if (activePartition.First != null)
                         {
-                            var item = _partitions[_activePartition].First;
-                            _partitions[_activePartition].RemoveFirst();
+                            var item = activePartition.First;
+                            activePartition.RemoveFirst();
+
                             return item.Value;
                         }
                     }
@@ -68,7 +82,16 @@ namespace MQTTnet.Internal
 
                 // No partition contains data so that we have to wait and put
                 // the worker back to the thread pool.
-                await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _signal.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // The cancelled token should "hide" the disposal of the signal.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    throw;
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -78,20 +101,25 @@ namespace MQTTnet.Internal
 
         public void Dispose()
         {
-            _semaphore?.Dispose();
+            _signal.Dispose();
         }
 
-        public void DropFirstItem(MqttPacketBusPartition partition)
+        public MqttPacketBusItem DropFirstItem(MqttPacketBusPartition partition)
         {
             lock (_syncRoot)
             {
                 var partitionInstance = _partitions[(int)partition];
 
-                if (partitionInstance.Any())
+                if (partitionInstance.Count > 0)
                 {
+                    var firstItem = partitionInstance.First.Value;
                     partitionInstance.RemoveFirst();
+
+                    return firstItem;
                 }
             }
+
+            return null;
         }
 
         public void EnqueueItem(MqttPacketBusItem item, MqttPacketBusPartition partition)
@@ -104,9 +132,8 @@ namespace MQTTnet.Internal
             lock (_syncRoot)
             {
                 _partitions[(int)partition].AddLast(item);
+                _signal.Set();
             }
-
-            _semaphore.Release();
         }
 
         public List<MqttPacket> ExportPackets(MqttPacketBusPartition partition)
@@ -114,6 +141,14 @@ namespace MQTTnet.Internal
             lock (_syncRoot)
             {
                 return _partitions[(int)partition].Select(i => i.Packet).ToList();
+            }
+        }
+
+        public int ItemsCount(MqttPacketBusPartition partition)
+        {
+            lock (_syncRoot)
+            {
+                return _partitions[(int)partition].Count;
             }
         }
 

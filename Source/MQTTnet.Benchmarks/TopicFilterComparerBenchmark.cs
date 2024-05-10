@@ -8,10 +8,10 @@ using BenchmarkDotNet.Jobs;
 
 namespace MQTTnet.Benchmarks
 {
-    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
+    [SimpleJob(RuntimeMoniker.Net60)]
     [RPlotExporter]
     [MemoryDiagnoser]
-    public class TopicFilterComparerBenchmark
+    public class TopicFilterComparerBenchmark : BaseBenchmark
     {
         static readonly char[] TopicLevelSeparator = { '/' };
 

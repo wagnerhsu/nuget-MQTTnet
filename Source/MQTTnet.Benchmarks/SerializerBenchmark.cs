@@ -17,7 +17,7 @@ using MQTTnet.Diagnostics;
 
 namespace MQTTnet.Benchmarks
 {
-    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
+    [SimpleJob(RuntimeMoniker.Net60)]
     [RPlotExporter]
     [MemoryDiagnoser]
     public class SerializerBenchmark : BaseBenchmark
@@ -54,7 +54,7 @@ namespace MQTTnet.Benchmarks
         public void Deserialize_10000_Messages()
         {
             var channel = new BenchmarkMqttChannel(_serializedPacket);
-            var reader = new MqttChannelAdapter(channel, new MqttPacketFormatterAdapter(new MqttBufferWriter(4096, 65535)), null, new MqttNetEventLogger());
+            var reader = new MqttChannelAdapter(channel, new MqttPacketFormatterAdapter(new MqttBufferWriter(4096, 65535)), new MqttNetEventLogger());
 
             for (var i = 0; i < 10000; i++)
             {
@@ -104,7 +104,7 @@ namespace MQTTnet.Benchmarks
                 return Task.FromResult(count);
             }
 
-            public Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            public Task WriteAsync(ArraySegment<byte> buffer, bool isEndOfPacket, CancellationToken cancellationToken)
             {
                 throw new NotSupportedException();
             }

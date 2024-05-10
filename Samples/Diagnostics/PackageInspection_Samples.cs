@@ -2,6 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+// ReSharper disable UnusedType.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable InconsistentNaming
+
 using MQTTnet.Diagnostics;
 
 namespace MQTTnet.Samples.Diagnostics;
@@ -22,7 +26,7 @@ public static class PackageInspection_Samples
                 .WithTcpServer("broker.hivemq.com")
                 .Build();
             
-            mqttClient.InspectPackage += OnInspectPackage;
+            mqttClient.InspectPacketAsync += OnInspectPacket;
             
             await mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
             
@@ -35,7 +39,7 @@ public static class PackageInspection_Samples
         }
     }
 
-    static Task OnInspectPackage(InspectMqttPacketEventArgs eventArgs)
+    static Task OnInspectPacket(InspectMqttPacketEventArgs eventArgs)
     {
         if (eventArgs.Direction == MqttPacketFlowDirection.Inbound)
         {
