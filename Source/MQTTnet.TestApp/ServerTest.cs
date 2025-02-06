@@ -4,13 +4,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using MQTTnet.Diagnostics;
-using MQTTnet.Extensions.ManagedClient;
-using MQTTnet.Implementations;
+using MQTTnet.Diagnostics.Logger;
+using MQTTnet.Internal;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
 using Newtonsoft.Json;
@@ -21,9 +19,9 @@ namespace MQTTnet.TestApp
     {
         public static void RunEmptyServer()
         {
-            var mqttServer = new MqttFactory().CreateMqttServer(new MqttServerOptions());
+            var mqttServer = new MqttServerFactory().CreateMqttServer(new MqttServerOptions());
             mqttServer.StartAsync().GetAwaiter().GetResult();
-            
+
             Console.WriteLine("Press any key to exit.");
             Console.ReadLine();
         }
@@ -32,20 +30,22 @@ namespace MQTTnet.TestApp
         {
             var logger = new MqttNetEventLogger();
             MqttNetConsoleLogger.ForwardToConsole(logger);
-           
-            var mqttFactory = new MqttFactory(logger);
-            var mqttServer = mqttFactory.CreateMqttServer(new MqttServerOptions());
+
+            var mqttServerFactory = new MqttServerFactory(logger);
+            var mqttServer = mqttServerFactory.CreateMqttServer(new MqttServerOptions());
             mqttServer.StartAsync().GetAwaiter().GetResult();
 
             Console.WriteLine("Press any key to exit.");
             Console.ReadLine();
         }
-        
+
         public static async Task RunAsync()
         {
             try
             {
-                var options = new MqttServerOptions();
+                var options = new MqttServerOptionsBuilder()
+                    .WithDefaultEndpoint()
+                    .Build();
 
                 // Extend the timestamp for all messages from clients.
                 // Protect several topics from being subscribed from every client.
@@ -56,10 +56,10 @@ namespace MQTTnet.TestApp
                 //options.DefaultEndpointOptions.IsEnabled = true;
                 //options.TlsEndpointOptions.IsEnabled = false;
 
-                var mqttServer = new MqttFactory().CreateMqttServer(options);
+                var mqttServer = new MqttServerFactory().CreateMqttServer(options);
 
                 const string Filename = "C:\\MQTT\\RetainedMessages.json";
-                
+
                 mqttServer.RetainedMessageChangedAsync += e =>
                 {
                     var directory = Path.GetDirectoryName(Filename);
@@ -69,15 +69,15 @@ namespace MQTTnet.TestApp
                     }
 
                     File.WriteAllText(Filename, JsonConvert.SerializeObject(e.StoredRetainedMessages));
-                    return Task.FromResult(0);
+                    return CompletedTask.Instance;
                 };
-                
+
                 mqttServer.RetainedMessagesClearedAsync += e =>
                 {
                     File.Delete(Filename);
-                    return Task.FromResult(0);
+                    return CompletedTask.Instance;
                 };
-                
+
                 mqttServer.LoadingRetainedMessageAsync += e =>
                 {
                     List<MqttApplicationMessage> retainedMessages;
@@ -93,16 +93,16 @@ namespace MQTTnet.TestApp
 
                     e.LoadedRetainedMessages = retainedMessages;
 
-                    return Task.FromResult(0);
+                    return CompletedTask.Instance;
                 };
 
                 mqttServer.InterceptingPublishAsync += e =>
                 {
                     if (MqttTopicFilterComparer.Compare(e.ApplicationMessage.Topic, "/myTopic/WithTimestamp/#") == MqttTopicFilterCompareResult.IsMatch)
                     {
-                        // Replace the payload with the timestamp. But also extending a JSON 
+                        // Replace the payload with the timestamp. But also extending a JSON
                         // based payload with the timestamp is a suitable use case.
-                        e.ApplicationMessage.Payload = Encoding.UTF8.GetBytes(DateTime.Now.ToString("O"));
+                        e.ApplicationMessage.PayloadSegment = new ArraySegment<byte>(Encoding.UTF8.GetBytes(DateTime.Now.ToString("O")));
                     }
 
                     if (e.ApplicationMessage.Topic == "not_allowed_topic")
@@ -111,20 +111,20 @@ namespace MQTTnet.TestApp
                         e.CloseConnection = true;
                     }
 
-                    return PlatformAbstractionLayer.CompletedTask;
+                    return CompletedTask.Instance;
                 };
-                
+
                 mqttServer.ValidatingConnectionAsync += e =>
                 {
                     if (e.ClientId == "SpecialClient")
                     {
-                        if (e.Username != "USER" || e.Password != "PASS")
+                        if (e.UserName != "USER" || e.Password != "PASS")
                         {
                             e.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                         }
                     }
 
-                    return PlatformAbstractionLayer.CompletedTask;
+                    return CompletedTask.Instance;
                 };
 
                 mqttServer.InterceptingSubscriptionAsync += e =>
@@ -140,16 +140,19 @@ namespace MQTTnet.TestApp
                         e.CloseConnection = true;
                     }
 
-                    return PlatformAbstractionLayer.CompletedTask;
+                    return CompletedTask.Instance;
                 };
-                
+
                 mqttServer.InterceptingPublishAsync += e =>
                 {
-                    MqttNetConsoleLogger.PrintToConsole(
-                        $"'{e.ClientId}' reported '{e.ApplicationMessage.Topic}' > '{Encoding.UTF8.GetString(e.ApplicationMessage.Payload ?? new byte[0])}'",
-                        ConsoleColor.Magenta);
-                    
-                    return PlatformAbstractionLayer.CompletedTask;
+                    var payloadText = string.Empty;
+                    if (e.ApplicationMessage.Payload.Length > 0)
+                    {
+                        payloadText = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                    }
+
+                    MqttNetConsoleLogger.PrintToConsole($"'{e.ClientId}' reported '{e.ApplicationMessage.Topic}' > '{payloadText}'", ConsoleColor.Magenta);
+                    return CompletedTask.Instance;
                 };
 
                 //options.ApplicationMessageInterceptor = c =>
@@ -177,7 +180,7 @@ namespace MQTTnet.TestApp
                 mqttServer.ClientConnectedAsync += e =>
                 {
                     Console.Write("Client disconnected event fired.");
-                    return PlatformAbstractionLayer.CompletedTask;
+                    return CompletedTask.Instance;
                 };
 
                 await mqttServer.StartAsync();

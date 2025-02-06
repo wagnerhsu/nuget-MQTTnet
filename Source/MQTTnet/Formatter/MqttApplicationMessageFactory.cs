@@ -7,14 +7,11 @@ using MQTTnet.Packets;
 
 namespace MQTTnet.Formatter
 {
-    public sealed class MqttApplicationMessageFactory
+    public static class MqttApplicationMessageFactory
     {
-        public MqttApplicationMessage Create(MqttPublishPacket publishPacket)
+        public static MqttApplicationMessage Create(MqttPublishPacket publishPacket)
         {
-            if (publishPacket == null)
-            {
-                throw new ArgumentNullException(nameof(publishPacket));
-            }
+            ArgumentNullException.ThrowIfNull(publishPacket);
 
             return new MqttApplicationMessage
             {

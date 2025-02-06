@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
+using MQTTnet.Server.Internal;
 using MQTTnet.Tests.Mockups;
 
 namespace MQTTnet.Tests.Server
@@ -114,6 +115,104 @@ namespace MQTTnet.Tests.Server
             Assert.AreEqual(result.QualityOfServiceLevel, MqttQualityOfServiceLevel.AtLeastOnce);
         }
 
+        [TestMethod]
+        public async Task MqttSubscriptionsManager_SubscribeWildcard1()
+        {
+            await SubscribeToTopic("house/+/room");
+            await SubscribeToTopic("house/+/room/+");
+
+            CheckIsSubscribed("house/1/room");
+            CheckIsSubscribed("house/1/room/bed");
+            CheckIsSubscribed("house/1/room/chair");
+            CheckIsSubscribed("house/2/room/bed");
+            CheckIsSubscribed("house/2/room/chair");
+
+            CheckIsNotSubscribed("house/1/room/bed/cover");
+            CheckIsNotSubscribed("house/1/study/bed");
+        }
+
+        [TestMethod]
+        public async Task MqttSubscriptionsManager_SubscribeWildcard2()
+        {
+            await SubscribeToTopic("house/+/room");
+            await SubscribeToTopic("house/+/room/#");
+
+            CheckIsSubscribed("house/1/room");
+            CheckIsSubscribed("house/1/room/bed");
+            CheckIsSubscribed("house/2/room");
+            CheckIsSubscribed("house/2/room/bed");
+            CheckIsSubscribed("house/2/room/bed/cover");
+
+            CheckIsNotSubscribed("house/1/level");
+            CheckIsNotSubscribed("house/1/level/door");
+        }
+
+        [TestMethod]
+        public async Task MqttSubscriptionsManager_SubscribeWildcard3()
+        {
+            await SubscribeToTopic("house/1/room");
+            await SubscribeToTopic("house/1/room/+");
+
+            CheckIsSubscribed("house/1/room");
+            CheckIsSubscribed("house/1/room/bed");
+            CheckIsSubscribed("house/1/room/chair");
+
+            CheckIsNotSubscribed("house/2/room");
+            CheckIsNotSubscribed("house/2/room/bed/cover");
+        }
+
+        [TestMethod]
+        public async Task MqttSubscriptionsManager_SubscribeWildcard4()
+        {
+            await SubscribeToTopic("house/1/+/+");
+
+            CheckIsSubscribed("house/1/room/bed");
+            CheckIsSubscribed("house/1/room/chair");
+
+            CheckIsNotSubscribed("house/1/room");
+            CheckIsNotSubscribed("house/1/room/bed/cover");
+        }
+
+        [TestMethod]
+        public async Task MqttSubscriptionsManager_SubscribeWildcard5()
+        {
+            await SubscribeToTopic("house/1/+/#");
+
+            CheckIsSubscribed("house/1/room/bed");
+            CheckIsSubscribed("house/1/room/chair");
+            CheckIsSubscribed("house/1/room/chair/leg");
+            CheckIsSubscribed("house/1/level/window");
+            CheckIsSubscribed("house/1/level/door");
+
+            CheckIsNotSubscribed("house/2/room/bed");
+        }
+
+        async Task SubscribeToTopic(string topic)
+        {
+            var sp = new MqttSubscribePacket
+            {
+                TopicFilters = new List<MqttTopicFilter>
+                {
+                    new MqttTopicFilter { Topic = topic, QualityOfServiceLevel = MqttQualityOfServiceLevel.AtMostOnce },
+                }
+            };
+
+            await _subscriptionsManager.Subscribe(sp, CancellationToken.None);
+        }
+
+        void CheckIsSubscribed(string topic)
+        {
+            var result = CheckSubscriptions(topic, MqttQualityOfServiceLevel.AtMostOnce, "");
+            Assert.IsTrue(result.IsSubscribed);
+            Assert.AreEqual(result.QualityOfServiceLevel, MqttQualityOfServiceLevel.AtMostOnce);
+        }
+
+        void CheckIsNotSubscribed(string topic)
+        {
+            var result = CheckSubscriptions(topic, MqttQualityOfServiceLevel.AtMostOnce, "");
+            Assert.IsFalse(result.IsSubscribed);
+        }
+
         [TestInitialize]
         public void TestInitialize()
         {
@@ -123,16 +222,17 @@ namespace MQTTnet.Tests.Server
             var eventContainer = new MqttServerEventContainer();
             var clientSessionManager = new MqttClientSessionsManager(options, retainedMessagesManager, eventContainer, logger);
 
-            var session = new MqttSession("", false, new ConcurrentDictionary<object, object>(), options, eventContainer, retainedMessagesManager, clientSessionManager);
+            var session = new MqttSession(new MqttConnectPacket
+            {
+                ClientId = ""
+            }, new ConcurrentDictionary<object, object>(), options, eventContainer, retainedMessagesManager, clientSessionManager);
 
             _subscriptionsManager = new MqttClientSubscriptionsManager(session, new MqttServerEventContainer(), retainedMessagesManager, clientSessionManager);
         }
 
         CheckSubscriptionsResult CheckSubscriptions(string topic, MqttQualityOfServiceLevel applicationMessageQoSLevel, string senderClientId)
         {
-            ulong topicHashMask; // not needed
-            bool hasWildcard; // not needed
-            MqttSubscription.CalculateTopicHash(topic, out var topicHash, out topicHashMask, out hasWildcard);
+            MqttTopicHash.Calculate(topic, out var topicHash, out _, out _);
             return _subscriptionsManager.CheckSubscriptions(topic, topicHash, applicationMessageQoSLevel, senderClientId);
         }
     }

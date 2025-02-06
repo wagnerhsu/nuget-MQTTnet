@@ -72,11 +72,11 @@ namespace MQTTnet.Formatter.V5
 
             if (value == MqttQualityOfServiceLevel.AtLeastOnce)
             {
-                Write(MqttPropertyId.MaximumQoS, true);
+                Write(MqttPropertyId.MaximumQoS, 0x1);
             }
             else
             {
-                Write(MqttPropertyId.MaximumQoS, false);
+                Write(MqttPropertyId.MaximumQoS, 0x0);
             }
         }
 
@@ -84,6 +84,11 @@ namespace MQTTnet.Formatter.V5
         {
             // If absent, the Application Message does not expire.
             // This library uses 0 to indicate no expiration.
+            if (value == 0)
+            {
+                return;
+            }
+            
             WriteAsFourByteInteger(MqttPropertyId.MessageExpiryInterval, value);
         }
 
@@ -216,7 +221,7 @@ namespace MQTTnet.Formatter.V5
         {
             if (value)
             {
-                // Absence of the flag means it is supported! 
+                // Absence of the flag means it is supported!
                 return;
             }
 
@@ -225,10 +230,7 @@ namespace MQTTnet.Formatter.V5
 
         public void WriteTo(MqttBufferWriter target)
         {
-            if (target == null)
-            {
-                throw new ArgumentNullException(nameof(target));
-            }
+            ArgumentNullException.ThrowIfNull(target);
 
             target.WriteVariableByteInteger((uint)_bufferWriter.Length);
             target.Write(_bufferWriter);
@@ -330,7 +332,7 @@ namespace MQTTnet.Formatter.V5
             }
 
             _bufferWriter.WriteByte((byte)id);
-            _bufferWriter.WriteBinaryData(value);
+            _bufferWriter.WriteBinary(value);
         }
 
         void WriteAsFourByteInteger(MqttPropertyId id, uint value)

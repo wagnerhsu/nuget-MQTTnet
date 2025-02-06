@@ -2,8 +2,12 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+// ReSharper disable UnusedType.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable InconsistentNaming
+
 using System.Text;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
 
 namespace MQTTnet.Samples.Diagnostics;
 
@@ -16,7 +20,7 @@ public static class Logger_Samples
          * to other loggers like Microsoft logger or Serilog or log4net etc.
          */
 
-        var mqttFactory = new MqttFactory(new MyLogger());
+        var mqttFactory = new MqttClientFactory(new MyLogger());
 
         var mqttClientOptions = mqttFactory.CreateClientOptionsBuilder()
             .WithTcpServer("broker.hivemq.com")
@@ -58,7 +62,7 @@ public static class Logger_Samples
             Console.Write(output);
         };
 
-        var mqttFactory = new MqttFactory(mqttEventLogger);
+        var mqttFactory = new MqttClientFactory(mqttEventLogger);
 
         var mqttClientOptions = mqttFactory.CreateClientOptionsBuilder()
             .WithTcpServer("broker.hivemq.com")

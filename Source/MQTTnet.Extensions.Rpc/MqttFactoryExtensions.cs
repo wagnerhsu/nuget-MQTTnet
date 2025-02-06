@@ -3,33 +3,25 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using MQTTnet.Client;
 
 namespace MQTTnet.Extensions.Rpc
 {
     public static class MqttFactoryExtensions
     {
-        public static MqttRpcClient CreateMqttRpcClient(this MqttFactory factory, MqttClient mqttClient)
+        public static IMqttRpcClient CreateMqttRpcClient(this MqttClientFactory clientFactory, IMqttClient mqttClient)
         {
-            return factory.CreateMqttRpcClient(mqttClient, new MqttRpcClientOptions
-            {
-                TopicGenerationStrategy = new DefaultMqttRpcClientTopicGenerationStrategy()
-            });
+            return clientFactory.CreateMqttRpcClient(
+                mqttClient,
+                new MqttRpcClientOptions
+                {
+                    TopicGenerationStrategy = new DefaultMqttRpcClientTopicGenerationStrategy()
+                });
         }
 
-        public static MqttRpcClient CreateMqttRpcClient(this MqttFactory factory, MqttClient mqttClient, MqttRpcClientOptions rpcClientOptions)
+        public static IMqttRpcClient CreateMqttRpcClient(this MqttClientFactory _, IMqttClient mqttClient, MqttRpcClientOptions rpcClientOptions)
         {
-            if (factory == null) throw new ArgumentNullException(nameof(factory));
-            
-            if (mqttClient == null)
-            {
-                throw new ArgumentNullException(nameof(mqttClient));
-            }
-
-            if (rpcClientOptions == null)
-            {
-                throw new ArgumentNullException(nameof(rpcClientOptions));
-            }
+            ArgumentNullException.ThrowIfNull(mqttClient);
+            ArgumentNullException.ThrowIfNull(rpcClientOptions);
 
             return new MqttRpcClient(mqttClient, rpcClientOptions);
         }

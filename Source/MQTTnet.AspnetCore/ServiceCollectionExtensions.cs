@@ -4,102 +4,106 @@
 
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using MQTTnet.Adapter;
-using MQTTnet.Diagnostics;
-using MQTTnet.Implementations;
+using MQTTnet.Diagnostics.Logger;
 using MQTTnet.Server;
+using MQTTnet.Server.Internal.Adapter;
 
-namespace MQTTnet.AspNetCore
+namespace MQTTnet.AspNetCore;
+
+public static class ServiceCollectionExtensions
 {
-    public static class ServiceCollectionExtensions
+    public static IServiceCollection AddHostedMqttServer(this IServiceCollection services, MqttServerOptions options)
     {
-        public static IServiceCollection AddMqttServer(this IServiceCollection serviceCollection, Action<MqttServerOptionsBuilder> configure = null)
-        {
-            if (serviceCollection is null)
-            {
-                throw new ArgumentNullException(nameof(serviceCollection));
-            }
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
 
-            serviceCollection.AddMqttConnectionHandler();
-            serviceCollection.AddHostedMqttServer(configure);
-            
-            return serviceCollection;
-        }
+        services.AddSingleton(options);
+        services.AddHostedMqttServer();
 
-        public static IServiceCollection AddHostedMqttServer(this IServiceCollection services, MqttServerOptions options)
-        {
-            if (options == null) throw new ArgumentNullException(nameof(options));
+        return services;
+    }
 
-            services.AddSingleton(options);
+    public static IServiceCollection AddHostedMqttServer(this IServiceCollection services, Action<MqttServerOptionsBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
 
-            services.AddHostedMqttServer();
+        var serverOptionsBuilder = new MqttServerOptionsBuilder();
 
-            return services;
-        }
+        configure?.Invoke(serverOptionsBuilder);
 
-        public static IServiceCollection AddHostedMqttServer(this IServiceCollection services, Action<MqttServerOptionsBuilder> configure = null)
-        {
-            services.AddSingleton(s =>
-            {
-                var serverOptionsBuilder = new MqttServerOptionsBuilder();
-                configure?.Invoke(serverOptionsBuilder);
-                return serverOptionsBuilder.Build();
-            });
+        var options = serverOptionsBuilder.Build();
 
-            services.AddHostedMqttServer();
+        return AddHostedMqttServer(services, options);
+    }
 
-            return services;
-        }
+    public static void AddHostedMqttServer(this IServiceCollection services)
+    {
+        // The user may have these services already registered.
+        services.TryAddSingleton<IMqttNetLogger>(MqttNetNullLogger.Instance);
+        services.TryAddSingleton(new MqttServerFactory());
 
-        public static IServiceCollection AddHostedMqttServerWithServices(this IServiceCollection services, Action<AspNetMqttServerOptionsBuilder> configure)
-        {
-            services.AddSingleton(s =>
+        services.AddSingleton<MqttHostedServer>();
+        services.AddSingleton<IHostedService>(s => s.GetService<MqttHostedServer>());
+        services.AddSingleton<MqttServer>(s => s.GetService<MqttHostedServer>());
+    }
+
+    public static IServiceCollection AddHostedMqttServerWithServices(this IServiceCollection services, Action<AspNetMqttServerOptionsBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton(
+            s =>
             {
                 var builder = new AspNetMqttServerOptionsBuilder(s);
                 configure(builder);
                 return builder.Build();
             });
 
-            services.AddHostedMqttServer();
+        services.AddHostedMqttServer();
 
-            return services;
-        }
+        return services;
+    }
 
-        static IServiceCollection AddHostedMqttServer(this IServiceCollection services)
-        {
-            var logger = new MqttNetEventLogger();
+    public static IServiceCollection AddMqttConnectionHandler(this IServiceCollection services)
+    {
+        services.AddSingleton<MqttConnectionHandler>();
+        services.AddSingleton<IMqttServerAdapter>(s => s.GetService<MqttConnectionHandler>());
 
-            services.AddSingleton<IMqttNetLogger>(logger);
-            services.AddSingleton<MqttHostedServer>();
-            services.AddSingleton<IHostedService>(s => s.GetService<MqttHostedServer>());
-            services.AddSingleton<MqttServer>(s => s.GetService<MqttHostedServer>());
+        return services;
+    }
 
-            return services;
-        }
+    public static void AddMqttLogger(this IServiceCollection services, IMqttNetLogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(services);
 
-        public static IServiceCollection AddMqttWebSocketServerAdapter(this IServiceCollection services)
-        {
-            services.AddSingleton<MqttWebSocketServerAdapter>();
-            services.AddSingleton<IMqttServerAdapter>(s => s.GetService<MqttWebSocketServerAdapter>());
+        services.AddSingleton(logger);
+    }
 
-            return services;
-        }
+    public static IServiceCollection AddMqttServer(this IServiceCollection serviceCollection, Action<MqttServerOptionsBuilder> configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(serviceCollection);
 
-        public static IServiceCollection AddMqttTcpServerAdapter(this IServiceCollection services)
-        {
-            services.AddSingleton<MqttTcpServerAdapter>();
-            services.AddSingleton<IMqttServerAdapter>(s => s.GetService<MqttTcpServerAdapter>());
+        serviceCollection.AddMqttConnectionHandler();
+        serviceCollection.AddHostedMqttServer(configure);
 
-            return services;
-        }
+        return serviceCollection;
+    }
 
-        public static IServiceCollection AddMqttConnectionHandler(this IServiceCollection services)
-        {
-            services.AddSingleton<MqttConnectionHandler>();
-            services.AddSingleton<IMqttServerAdapter>(s => s.GetService<MqttConnectionHandler>());
+    public static IServiceCollection AddMqttTcpServerAdapter(this IServiceCollection services)
+    {
+        services.AddSingleton<MqttTcpServerAdapter>();
+        services.AddSingleton<IMqttServerAdapter>(s => s.GetService<MqttTcpServerAdapter>());
 
-            return services;
-        }
+        return services;
+    }
+
+    public static IServiceCollection AddMqttWebSocketServerAdapter(this IServiceCollection services)
+    {
+        services.AddSingleton<MqttWebSocketServerAdapter>();
+        services.AddSingleton<IMqttServerAdapter>(s => s.GetService<MqttWebSocketServerAdapter>());
+
+        return services;
     }
 }

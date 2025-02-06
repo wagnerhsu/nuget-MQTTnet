@@ -13,7 +13,7 @@ namespace MQTTnet.Formatter.V5
 {
     public sealed class MqttV5PacketDecoder
     {
-        readonly MqttBufferReader _bufferReader = new MqttBufferReader();
+        readonly MqttBufferReader _bufferReader = new();
 
         public MqttPacket Decode(ReceivedMqttPacket receivedMqttPacket)
         {
@@ -54,7 +54,7 @@ namespace MQTTnet.Formatter.V5
                     return DecodeSubscribePacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.SubAck:
                     return DecodeSubAckPacket(receivedMqttPacket.Body);
-                case MqttControlPacketType.Unsubscibe:
+                case MqttControlPacketType.Unsubscribe:
                     return DecodeUnsubscribePacket(receivedMqttPacket.Body);
                 case MqttControlPacketType.UnsubAck:
                     return DecodeUnsubAckPacket(receivedMqttPacket.Body);
@@ -68,12 +68,12 @@ namespace MQTTnet.Formatter.V5
 
         MqttPacket DecodeAuthPacket(ArraySegment<byte> body)
         {
-            ThrowIfBodyIsEmpty(body);
-
             _bufferReader.SetBuffer(body.Array, body.Offset, body.Count);
 
             var packet = new MqttAuthPacket();
 
+            // MQTT spec: The Reason Code and Property Length can be omitted if the Reason Code is 0x00 (Success) and there are no Properties.
+            // In this case the AUTH has a Remaining Length of 0.
             if (_bufferReader.EndOfStream)
             {
                 packet.ReasonCode = MqttAuthenticateReasonCode.Success;
@@ -129,6 +129,9 @@ namespace MQTTnet.Formatter.V5
                 // Absence indicates max QoS level.
                 MaximumQoS = MqttQualityOfServiceLevel.ExactlyOnce
             };
+
+            // Also set the return code of MQTT 3.1.1 for backward compatibility and debugging purposes.
+            packet.ReturnCode = MqttConnectReasonCodeConverter.ToConnectReturnCode(packet.ReasonCode);
 
             var propertiesReader = new MqttV5PropertiesReader(_bufferReader);
             while (propertiesReader.MoveNext())
@@ -217,7 +220,7 @@ namespace MQTTnet.Formatter.V5
             var packet = new MqttConnectPacket
             {
                 // If the Request Problem Information is absent, the value of 1 is used.
-                RequestProblemInformation = true 
+                RequestProblemInformation = true
             };
 
             var protocolName = _bufferReader.ReadString();
@@ -349,7 +352,16 @@ namespace MQTTnet.Formatter.V5
 
         MqttPacket DecodeDisconnectPacket(ArraySegment<byte> body)
         {
-            ThrowIfBodyIsEmpty(body);
+            // From RFC: 3.14.2.1 Disconnect Reason Code
+            // Byte 1 in the Variable Header is the Disconnect Reason Code.
+            // If the Remaining Length is less than 1 the value of 0x00 (Normal disconnection) is used.
+            if (body.Count == 0)
+            {
+                return new MqttDisconnectPacket
+                {
+                    ReasonCode = MqttDisconnectReasonCode.NormalDisconnection
+                };
+            }
 
             _bufferReader.SetBuffer(body.Array, body.Offset, body.Count);
 
@@ -383,7 +395,7 @@ namespace MQTTnet.Formatter.V5
 
             return packet;
         }
-        
+
         MqttPacket DecodePubAckPacket(ArraySegment<byte> body)
         {
             ThrowIfBodyIsEmpty(body);
@@ -528,7 +540,7 @@ namespace MQTTnet.Formatter.V5
 
             if (!_bufferReader.EndOfStream)
             {
-                packet.Payload = _bufferReader.ReadRemainingData();
+                packet.PayloadSegment = new ArraySegment<byte>(_bufferReader.ReadRemainingData());
             }
 
             return packet;
@@ -721,7 +733,7 @@ namespace MQTTnet.Formatter.V5
             packet.UserProperties = propertiesReader.CollectedUserProperties;
 
             packet.ReasonCodes = new List<MqttUnsubscribeReasonCode>(_bufferReader.BytesLeft);
-            
+
             while (!_bufferReader.EndOfStream)
             {
                 var reasonCode = (MqttUnsubscribeReasonCode)_bufferReader.ReadByte();

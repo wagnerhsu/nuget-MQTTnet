@@ -5,25 +5,19 @@
 using System;
 using System.Text;
 
-namespace MQTTnet
+namespace MQTTnet;
+
+public static class MqttApplicationMessageExtensions
 {
-    public static class MqttApplicationMessageExtensions
+    public static string ConvertPayloadToString(this MqttApplicationMessage applicationMessage)
     {
-        public static string ConvertPayloadToString(this MqttApplicationMessage applicationMessage)
+        ArgumentNullException.ThrowIfNull(applicationMessage);
+
+        if (applicationMessage.Payload.Length == 0)
         {
-            if (applicationMessage == null) throw new ArgumentNullException(nameof(applicationMessage));
-
-            if (applicationMessage.Payload == null)
-            {
-                return null;
-            }
-
-            if (applicationMessage.Payload.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            return Encoding.UTF8.GetString(applicationMessage.Payload, 0, applicationMessage.Payload.Length);
+            return null;
         }
+
+        return Encoding.UTF8.GetString(applicationMessage.Payload);
     }
 }

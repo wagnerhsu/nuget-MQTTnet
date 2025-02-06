@@ -4,21 +4,19 @@
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using MQTTnet.Client;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
-using MQTTnet.AspNetCore.Client;
 using MQTTnet.AspNetCore;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
 
 namespace MQTTnet.Benchmarks
 {
-    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
+    [SimpleJob(RuntimeMoniker.Net60)]
     [MemoryDiagnoser]
-    public class MessageProcessingMqttConnectionContextBenchmark
+    public class MessageProcessingMqttConnectionContextBenchmark : BaseBenchmark
     {
         IWebHost _host;
-        MqttClient _mqttClient;
+        IMqttClient _mqttClient;
         MqttApplicationMessage _message;
 
         [GlobalSetup]
@@ -38,7 +36,7 @@ namespace MQTTnet.Benchmarks
                    })
                    .Build();
 
-            var factory = new MqttFactory();
+            var factory = new MqttClientFactory();
             _mqttClient = factory.CreateMqttClient(new MqttNetEventLogger(), new MqttClientConnectionContextFactory());
 
             _host.StartAsync().GetAwaiter().GetResult();

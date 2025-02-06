@@ -6,20 +6,19 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet.Adapter;
-using MQTTnet.Client;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
+using MQTTnet.Diagnostics.PacketInspection;
 using MQTTnet.Exceptions;
 using MQTTnet.Internal;
 using MQTTnet.Packets;
 
 namespace MQTTnet.LowLevelClient
 {
-    public sealed class LowLevelMqttClient : IDisposable
+    public sealed class LowLevelMqttClient : ILowLevelMqttClient
     {
         readonly IMqttClientAdapterFactory _clientAdapterFactory;
         readonly AsyncEvent<InspectMqttPacketEventArgs> _inspectPacketEvent = new AsyncEvent<InspectMqttPacketEventArgs>();
         readonly MqttNetSourceLogger _logger;
-
         readonly IMqttNetLogger _rootLogger;
 
         IMqttChannelAdapter _adapter;
@@ -32,7 +31,7 @@ namespace MQTTnet.LowLevelClient
             _logger = logger.WithSource(nameof(LowLevelMqttClient));
         }
 
-        public event Func<InspectMqttPacketEventArgs, Task> InspectPackage
+        public event Func<InspectMqttPacketEventArgs, Task> InspectPacketAsync
         {
             add => _inspectPacketEvent.AddHandler(value);
             remove => _inspectPacketEvent.RemoveHandler(value);
@@ -42,23 +41,26 @@ namespace MQTTnet.LowLevelClient
 
         public async Task ConnectAsync(MqttClientOptions options, CancellationToken cancellationToken)
         {
-            if (options is null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
+            ArgumentNullException.ThrowIfNull(options);
 
             if (_adapter != null)
             {
                 throw new InvalidOperationException("Low level MQTT client is already connected. Disconnect first before connecting again.");
             }
 
-            var newAdapter = _clientAdapterFactory.CreateClientAdapter(options, new MqttPacketInspector(_inspectPacketEvent, _rootLogger), _rootLogger);
+            MqttPacketInspector packetInspector = null;
+            if (_inspectPacketEvent.HasHandlers)
+            {
+                packetInspector = new MqttPacketInspector(_inspectPacketEvent, _rootLogger);
+            }
+
+            var newAdapter = _clientAdapterFactory.CreateClientAdapter(options, packetInspector, _rootLogger);
 
             try
             {
-                _logger.Verbose("Trying to connect with server '{0}'.", options.ChannelOptions);
+                _logger.Verbose("Trying to connect with server '{0}'", options.ChannelOptions);
                 await newAdapter.ConnectAsync(cancellationToken).ConfigureAwait(false);
-                _logger.Verbose("Connection with server established.");
+                _logger.Verbose("Connection with server established");
             }
             catch (Exception)
             {
@@ -122,10 +124,7 @@ namespace MQTTnet.LowLevelClient
 
         public async Task SendAsync(MqttPacket packet, CancellationToken cancellationToken)
         {
-            if (packet is null)
-            {
-                throw new ArgumentNullException(nameof(packet));
-            }
+            ArgumentNullException.ThrowIfNull(packet);
 
             var adapter = _adapter;
             if (adapter == null)

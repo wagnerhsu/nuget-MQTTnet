@@ -2,11 +2,15 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using MQTTnet.Exceptions;
+using MQTTnet.Internal;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 
@@ -17,8 +21,9 @@ namespace MQTTnet
         string _contentType;
         byte[] _correlationData;
         uint _messageExpiryInterval;
-        byte[] _payload;
+
         MqttPayloadFormatIndicator _payloadFormatIndicator;
+        ReadOnlySequence<byte> _payload;
         MqttQualityOfServiceLevel _qualityOfServiceLevel = MqttQualityOfServiceLevel.AtMostOnce;
         string _responseTopic;
         bool _retain;
@@ -55,14 +60,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the content type to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithContentType(string contentType)
         {
             _contentType = contentType;
@@ -71,18 +70,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the correlation data to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="correlationData">
-        ///     The correlation data.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithCorrelationData(byte[] correlationData)
         {
             _correlationData = correlationData;
@@ -91,18 +80,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the message expiry interval in seconds to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="messageExpiryInterval">
-        ///     The message expiry interval.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithMessageExpiryInterval(uint messageExpiryInterval)
         {
             _messageExpiryInterval = messageExpiryInterval;
@@ -111,7 +90,13 @@ namespace MQTTnet
 
         public MqttApplicationMessageBuilder WithPayload(byte[] payload)
         {
-            _payload = payload;
+            _payload = payload == null || payload.Length == 0 ? EmptyBuffer.ReadOnlySequence : new ReadOnlySequence<byte>(payload);
+            return this;
+        }
+
+        public MqttApplicationMessageBuilder WithPayload(ArraySegment<byte> payloadSegment)
+        {
+            _payload = new ReadOnlySequence<byte>(payloadSegment);
             return this;
         }
 
@@ -119,88 +104,86 @@ namespace MQTTnet
         {
             if (payload == null)
             {
-                _payload = null;
-                return this;
+                return WithPayload(default(byte[]));
             }
 
-            _payload = payload as byte[] ?? payload.ToArray();
+            if (payload is byte[] byteArray)
+            {
+                return WithPayload(byteArray);
+            }
 
-            return this;
+            if (payload is ArraySegment<byte> arraySegment)
+            {
+                return WithPayloadSegment(arraySegment);
+            }
+
+            return WithPayload(payload.ToArray());
         }
 
         public MqttApplicationMessageBuilder WithPayload(Stream payload)
         {
-            if (payload == null)
-            {
-                _payload = null;
-                return this;
-            }
-
-            return WithPayload(payload, payload.Length - payload.Position);
+            return payload == null ? WithPayload(default(byte[])) : WithPayload(payload, payload.Length - payload.Position);
         }
 
         public MqttApplicationMessageBuilder WithPayload(Stream payload, long length)
         {
-            if (payload == null)
+            if (payload == null || length == 0)
             {
-                _payload = null;
-                return this;
+                return WithPayload(default(byte[]));
             }
 
-            if (payload.Length == 0)
+            var payloadBuffer = new byte[length];
+            var totalRead = 0;
+            do
             {
-                _payload = null;
-            }
-            else
-            {
-                _payload = new byte[length];
-
-                var totalRead = 0;
-                do
+                var bytesRead = payload.Read(payloadBuffer, totalRead, payloadBuffer.Length - totalRead);
+                if (bytesRead == 0)
                 {
-                    var bytesRead = payload.Read(_payload, totalRead, _payload.Length - totalRead);
-                    if (bytesRead == 0)
-                    {
-                        break;
-                    }
+                    break;
+                }
 
-                    totalRead += bytesRead;
-                } while (totalRead < length);
-            }
+                totalRead += bytesRead;
+            } while (totalRead < length);
 
-            return this;
+            return WithPayload(payloadBuffer);
         }
 
         public MqttApplicationMessageBuilder WithPayload(string payload)
         {
-            if (payload == null)
+            if (string.IsNullOrEmpty(payload))
             {
-                _payload = null;
-                return this;
+                return WithPayload(default(byte[]));
             }
 
-            _payload = string.IsNullOrEmpty(payload) ? null : Encoding.UTF8.GetBytes(payload);
+            var payloadBuffer = Encoding.UTF8.GetBytes(payload);
+            return WithPayload(payloadBuffer);
+        }
+
+        public MqttApplicationMessageBuilder WithPayload(ReadOnlySequence<byte> payload)
+        {
+            _payload = payload;
             return this;
         }
 
         /// <summary>
         ///     Adds the payload format indicator to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="payloadFormatIndicator">
-        ///     The payload format indicator.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithPayloadFormatIndicator(MqttPayloadFormatIndicator payloadFormatIndicator)
         {
             _payloadFormatIndicator = payloadFormatIndicator;
             return this;
+        }
+
+        public MqttApplicationMessageBuilder WithPayloadSegment(ArraySegment<byte> payloadSegment)
+        {
+            _payload = new ReadOnlySequence<byte>(payloadSegment);
+            return this;
+        }
+
+        public MqttApplicationMessageBuilder WithPayloadSegment(ReadOnlyMemory<byte> payloadSegment)
+        {
+            return MemoryMarshal.TryGetArray(payloadSegment, out var segment) ? WithPayloadSegment(segment) : WithPayload(payloadSegment.ToArray());
         }
 
         /// <summary>
@@ -220,18 +203,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the response topic to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="responseTopic">
-        ///     The response topic.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithResponseTopic(string responseTopic)
         {
             _responseTopic = responseTopic;
@@ -251,18 +224,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the subscription identifier to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="subscriptionIdentifier">
-        ///     The subscription identifier.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithSubscriptionIdentifier(uint subscriptionIdentifier)
         {
             if (_subscriptionIdentifiers == null)
@@ -289,18 +252,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the topic alias to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="topicAlias">
-        ///     The topic alias.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithTopicAlias(ushort topicAlias)
         {
             _topicAlias = topicAlias;
@@ -309,22 +262,8 @@ namespace MQTTnet
 
         /// <summary>
         ///     Adds the user property to the message.
-        ///     Hint: MQTT 5 feature only.
+        ///     <remarks>MQTT 5.0.0+ feature.</remarks>
         /// </summary>
-        /// <param
-        ///     name="name">
-        ///     The property name.
-        /// </param>
-        /// <param
-        ///     name="value">
-        ///     The property value.
-        /// </param>
-        /// <returns>
-        ///     A new instance of the
-        ///     <see
-        ///         cref="MqttApplicationMessageBuilder" />
-        ///     class.
-        /// </returns>
         public MqttApplicationMessageBuilder WithUserProperty(string name, string value)
         {
             if (_userProperties == null)

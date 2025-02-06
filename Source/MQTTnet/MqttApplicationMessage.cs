@@ -2,9 +2,12 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System.Collections.Generic;
+using MQTTnet.Internal;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
+using System;
+using System.Buffers;
+using System.Collections.Generic;
 
 namespace MQTTnet
 {
@@ -48,10 +51,20 @@ namespace MQTTnet
         public uint MessageExpiryInterval { get; set; }
 
         /// <summary>
-        ///     Gets or sets the payload.
-        ///     The payload is the data bytes sent via the MQTT protocol.
+        ///     Set an ArraySegment as Payload.
         /// </summary>
-        public byte[] Payload { get; set; }
+        public ArraySegment<byte> PayloadSegment
+        {
+            set { Payload = new ReadOnlySequence<byte>(value); }
+        }
+
+        /// <summary>
+        ///     Get or set ReadOnlySequence style of Payload.
+        ///     This payload type is used internally and is recommended for public use.
+        ///     It can be used in combination with a RecyclableMemoryStream to publish
+        ///     large buffered messages without allocating large chunks of memory.
+        /// </summary>
+        public ReadOnlySequence<byte> Payload { get; set; } = EmptyBuffer.ReadOnlySequence;
 
         /// <summary>
         ///     Gets or sets the payload format indicator.

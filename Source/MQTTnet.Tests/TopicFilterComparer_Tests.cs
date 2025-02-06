@@ -4,6 +4,7 @@
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MQTTnet.Server;
+using MQTTnet.Server.Internal;
 
 namespace MQTTnet.Tests
 {
@@ -150,18 +151,8 @@ namespace MQTTnet.Tests
         {
             Assert.AreEqual(expectedResult, MqttTopicFilterComparer.Compare(topic, filter));
 
-            ulong topicHash;
-            ulong topicHashMask;
-            bool topicHasWildcard;
-
-            MqttSubscription.CalculateTopicHash(topic, out topicHash, out topicHashMask, out topicHasWildcard);
-
-
-            ulong filterTopicHash;
-            ulong filterTopicHashMask;
-            bool filterTopicHasWildcard;
-
-            MqttSubscription.CalculateTopicHash(filter, out filterTopicHash, out filterTopicHashMask, out filterTopicHasWildcard);
+            MqttTopicHash.Calculate(topic, out var topicHash, out _, out _);
+            MqttTopicHash.Calculate(filter, out var filterTopicHash, out var filterTopicHashMask, out _);
 
             if (expectedResult == MqttTopicFilterCompareResult.IsMatch)
             {

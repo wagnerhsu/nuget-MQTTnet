@@ -2,7 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using MQTTnet.Diagnostics;
+// ReSharper disable UnusedType.Global
+// ReSharper disable UnusedMember.Global
+// ReSharper disable InconsistentNaming
+
+using MQTTnet.Diagnostics.PacketInspection;
 
 namespace MQTTnet.Samples.Diagnostics;
 
@@ -13,19 +17,19 @@ public static class PackageInspection_Samples
         /*
          * This sample covers the inspection of outgoing packages from the client.
          */
-        
-        var mqttFactory = new MqttFactory();
-        
+
+        var mqttFactory = new MqttClientFactory();
+
         using (var mqttClient = mqttFactory.CreateMqttClient())
         {
             var mqttClientOptions = mqttFactory.CreateClientOptionsBuilder()
                 .WithTcpServer("broker.hivemq.com")
                 .Build();
-            
-            mqttClient.InspectPackage += OnInspectPackage;
-            
+
+            mqttClient.InspectPacketAsync += OnInspectPacket;
+
             await mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
-            
+
             Console.WriteLine("MQTT client is connected.");
 
             var mqttClientDisconnectOptions = mqttFactory.CreateClientDisconnectOptionsBuilder()
@@ -35,7 +39,7 @@ public static class PackageInspection_Samples
         }
     }
 
-    static Task OnInspectPackage(InspectMqttPacketEventArgs eventArgs)
+    static Task OnInspectPacket(InspectMqttPacketEventArgs eventArgs)
     {
         if (eventArgs.Direction == MqttPacketFlowDirection.Inbound)
         {

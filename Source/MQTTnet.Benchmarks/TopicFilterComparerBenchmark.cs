@@ -8,10 +8,10 @@ using BenchmarkDotNet.Jobs;
 
 namespace MQTTnet.Benchmarks
 {
-    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
+    [SimpleJob(RuntimeMoniker.Net60)]
     [RPlotExporter]
     [MemoryDiagnoser]
-    public class TopicFilterComparerBenchmark
+    public class TopicFilterComparerBenchmark : BaseBenchmark
     {
         static readonly char[] TopicLevelSeparator = { '/' };
 
@@ -73,15 +73,8 @@ namespace MQTTnet.Benchmarks
 
         static bool LegacyMethodByStringSplit(string topic, string filter)
         {
-            if (topic == null)
-            {
-                throw new ArgumentNullException(nameof(topic));
-            }
-
-            if (filter == null)
-            {
-                throw new ArgumentNullException(nameof(filter));
-            }
+            ArgumentNullException.ThrowIfNull(topic);
+            ArgumentNullException.ThrowIfNull(filter);
 
             if (string.Equals(topic, filter, StringComparison.Ordinal))
             {

@@ -6,6 +6,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Text;
 using MQTTnet.Exceptions;
+using MQTTnet.Internal;
 using MQTTnet.Protocol;
 
 namespace MQTTnet.Formatter
@@ -18,7 +19,8 @@ namespace MQTTnet.Formatter
     /// </summary>
     public sealed class MqttBufferWriter
     {
-        public const uint VariableByteIntegerMaxValue = 268435455;
+        const uint VariableByteIntegerMaxValue = 268435455;
+        const int EncodedStringMaxLength = 65535;
 
         readonly int _maxBufferSize;
 
@@ -63,17 +65,30 @@ namespace MQTTnet.Formatter
             return _buffer;
         }
 
-        public static int GetLengthOfVariableInteger(uint value)
+        public static int GetVariableByteIntegerSize(uint value)
         {
-            var result = 0;
-            var x = value;
-            do
-            {
-                x /= 128;
-                result++;
-            } while (x > 0);
+            // From RFC: Table 2.4 Size of Remaining Length field
 
-            return result;
+            // 0 (0x00) to 127 (0x7F)
+            if (value <= 127)
+            {
+                return 1;
+            }
+
+            // 128 (0x80, 0x01) to 16 383 (0xFF, 0x7F)
+            if (value <= 16383)
+            {
+                return 2;
+            }
+
+            // 16 384 (0x80, 0x80, 0x01) to 2 097 151 (0xFF, 0xFF, 0x7F)
+            if (value <= 2097151)
+            {
+                return 3;
+            }
+
+            // 2 097 152 (0x80, 0x80, 0x80, 0x01) to 268 435 455 (0xFF, 0xFF, 0xFF, 0x7F)
+            return 4;
         }
 
         public void Reset(int length)
@@ -90,39 +105,12 @@ namespace MQTTnet.Formatter
 
         public void Write(MqttBufferWriter propertyWriter)
         {
-            if (propertyWriter is MqttBufferWriter writer)
-            {
-                WriteBinary(writer._buffer, 0, writer.Length);
-                return;
-            }
+            ArgumentNullException.ThrowIfNull(propertyWriter);
 
-            if (propertyWriter == null)
-            {
-                throw new ArgumentNullException(nameof(propertyWriter));
-            }
-
-            throw new InvalidOperationException($"{nameof(propertyWriter)} must be of type {nameof(MqttBufferWriter)}");
+            WriteBinary(propertyWriter._buffer, 0, propertyWriter.Length);
         }
 
-        public void WriteBinary(byte[] buffer, int offset, int count)
-        {
-            if (buffer == null)
-            {
-                throw new ArgumentNullException(nameof(buffer));
-            }
-
-            if (count == 0)
-            {
-                return;
-            }
-
-            EnsureAdditionalCapacity(count);
-
-            Array.Copy(buffer, offset, _buffer, _position, count);
-            IncreasePosition(count);
-        }
-
-        public void WriteBinaryData(byte[] value)
+        public void WriteBinary(byte[] value)
         {
             if (value == null || value.Length == 0)
             {
@@ -142,9 +130,24 @@ namespace MQTTnet.Formatter
                 _buffer[_position] = (byte)(valueLength >> 8);
                 _buffer[_position + 1] = (byte)valueLength;
 
-                Array.Copy(value, 0, _buffer, _position + 2, valueLength);
+                MqttMemoryHelper.Copy(value, 0, _buffer, _position + 2, valueLength);
                 IncreasePosition(valueLength + 2);
             }
+        }
+
+        public void WriteBinary(byte[] buffer, int offset, int count)
+        {
+            ArgumentNullException.ThrowIfNull(buffer);
+
+            if (count == 0)
+            {
+                return;
+            }
+
+            EnsureAdditionalCapacity(count);
+
+            MqttMemoryHelper.Copy(buffer, offset, _buffer, _position, count);
+            IncreasePosition(count);
         }
 
         public void WriteByte(byte @byte)
@@ -178,9 +181,16 @@ namespace MQTTnet.Formatter
 
                 var writtenBytes = Encoding.UTF8.GetBytes(value, 0, value.Length, _buffer, _position + 2);
 
+                // From RFC: 1.5.4 UTF-8 Encoded String
+                // Unless stated otherwise all UTF-8 encoded strings can have any length in the range 0 to 65,535 bytes.
+                if (writtenBytes > EncodedStringMaxLength)
+                {
+                    throw new MqttProtocolViolationException($"The maximum string length is 65535. The current string has a length of {writtenBytes}.");
+                }
+
                 _buffer[_position] = (byte)(writtenBytes >> 8);
                 _buffer[_position + 1] = (byte)writtenBytes;
-                
+
                 IncreasePosition(writtenBytes + 2);
             }
         }
@@ -265,8 +275,7 @@ namespace MQTTnet.Formatter
                 newBufferLength *= 2;
             }
 
-            // Array.Resize will create a new array and copy the existing
-            // data to the new one.
+            // Array.Resize will create a new array and copy the existing data to the new one.
             Array.Resize(ref _buffer, newBufferLength);
         }
 
@@ -277,6 +286,8 @@ namespace MQTTnet.Formatter
 
             if (_position > Length)
             {
+                // Also extend the position because we reached the end of the
+                // pre allocated buffer.
                 Length = _position;
             }
         }

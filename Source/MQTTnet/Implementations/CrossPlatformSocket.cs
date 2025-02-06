@@ -10,247 +10,191 @@ using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet.Exceptions;
 
-namespace MQTTnet.Implementations
+namespace MQTTnet.Implementations;
+
+public sealed class CrossPlatformSocket : IDisposable
 {
-    public sealed class CrossPlatformSocket : IDisposable
+    readonly Socket _socket;
+
+    NetworkStream _networkStream;
+
+    public CrossPlatformSocket(AddressFamily addressFamily, ProtocolType protocolType)
     {
-        readonly Socket _socket;
-        readonly Action _socketDisposeAction;
+        _socket = new Socket(addressFamily, SocketType.Stream, protocolType);
+    }
 
-        NetworkStream _networkStream;
+    public CrossPlatformSocket(ProtocolType protocolType)
+    {
+        // Having this constructor is important because avoiding the address family as parameter
+        // will make use of dual mode in the .net framework.
+        _socket = new Socket(SocketType.Stream, protocolType);
+    }
 
-        public CrossPlatformSocket(AddressFamily addressFamily)
+    CrossPlatformSocket(Socket socket)
+    {
+        _socket = socket ?? throw new ArgumentNullException(nameof(socket));
+        _networkStream = new NetworkStream(socket, true);
+    }
+
+    public bool DualMode
+    {
+        get => _socket.DualMode;
+        set => _socket.DualMode = value;
+    }
+
+    public bool IsConnected => _socket.Connected;
+
+    public bool KeepAlive
+    {
+        get => _socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive) as int? == 1;
+        set => _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, value ? 1 : 0);
+    }
+
+    public LingerOption LingerState
+    {
+        get => _socket.LingerState;
+        set => _socket.LingerState = value;
+    }
+
+    public EndPoint LocalEndPoint => _socket.LocalEndPoint;
+
+    public bool NoDelay
+    {
+        get => (int?)_socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay) != 0;
+        set => _socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, value ? 1 : 0);
+    }
+
+    public int ReceiveBufferSize
+    {
+        get => _socket.ReceiveBufferSize;
+        set => _socket.ReceiveBufferSize = value;
+    }
+
+    public EndPoint RemoteEndPoint => _socket.RemoteEndPoint;
+
+    public bool ReuseAddress
+    {
+        get => _socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress) as int? != 0;
+        set => _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, value ? 1 : 0);
+    }
+
+    public int SendBufferSize
+    {
+        get => _socket.SendBufferSize;
+        set => _socket.SendBufferSize = value;
+    }
+
+    public int SendTimeout
+    {
+        get => _socket.SendTimeout;
+        set => _socket.SendTimeout = value;
+    }
+
+    public int TcpKeepAliveInterval
+    {
+        get => _socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval) as int? ?? 0;
+        set => _socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, value);
+    }
+
+    public int TcpKeepAliveRetryCount
+    {
+        get => _socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount) as int? ?? 0;
+        set => _socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, value);
+    }
+
+    public int TcpKeepAliveTime
+    {
+        get => _socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime) as int? ?? 0;
+        set => _socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, value);
+    }
+
+    public async Task<CrossPlatformSocket> AcceptAsync(CancellationToken cancellationToken)
+    {
+        try
         {
-            _socket = new Socket(addressFamily, SocketType.Stream, ProtocolType.Tcp);
-            _socketDisposeAction = _socket.Dispose;
+            var clientSocket = await _socket.AcceptAsync(cancellationToken).ConfigureAwait(false);
+            return new CrossPlatformSocket(clientSocket);
         }
-
-        public CrossPlatformSocket()
+        catch (ObjectDisposedException)
         {
-            // Having this constructor is important because avoiding the address family as parameter
-            // will make use of dual mode in the .net framework.
-            _socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-
-            _socketDisposeAction = _socket.Dispose;
+            // This will happen when _socket.EndAccept_ gets called by Task library but the socket is already disposed.
+            return null;
         }
+    }
 
-        public CrossPlatformSocket(Socket socket)
+    public void Bind(EndPoint localEndPoint)
+    {
+        ArgumentNullException.ThrowIfNull(localEndPoint);
+
+        _socket.Bind(localEndPoint);
+    }
+
+    public async Task ConnectAsync(EndPoint endPoint, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(endPoint);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
         {
-            _socket = socket ?? throw new ArgumentNullException(nameof(socket));
-            _networkStream = new NetworkStream(socket, true);
-
-            _socketDisposeAction = _socket.Dispose;
-        }
-
-        public bool NoDelay
-        {
-            // We cannot use the _NoDelay_ property from the socket because there is an issue in .NET 4.5.2, 4.6.
-            // The decompiled code is: this.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.Debug, value ? 1 : 0);
-            // Which is wrong because the "NoDelay" should be set and not "Debug".
-            get => (int?)_socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay) != 0;
-            set => _socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, value ? 1 : 0);
-        }
-
-        public LingerOption LingerState
-        {
-            get => _socket.LingerState;
-            set => _socket.LingerState = value;
-        }
-
-        public bool DualMode
-        {
-            get => _socket.DualMode;
-            set => _socket.DualMode = value;
-        }
-
-        public int ReceiveBufferSize
-        {
-            get => _socket.ReceiveBufferSize;
-            set => _socket.ReceiveBufferSize = value;
-        }
-
-        public int SendBufferSize
-        {
-            get => _socket.SendBufferSize;
-            set => _socket.SendBufferSize = value;
-        }
-
-        public int SendTimeout
-        {
-            get => _socket.SendTimeout;
-            set => _socket.SendTimeout = value;
-        }
-
-        public EndPoint RemoteEndPoint => _socket.RemoteEndPoint;
-
-        public bool ReuseAddress
-        {
-            get => (int)_socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress) != 0;
-            set => _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, value ? 1 : 0);
-        }
-
-        public bool IsConnected => _socket.Connected;
-
-        public async Task<CrossPlatformSocket> AcceptAsync()
-        {
-            try
+            if (_networkStream != null)
             {
-#if NET452 || NET461
-                var clientSocket = await Task.Factory.FromAsync(_socket.BeginAccept, _socket.EndAccept, null).ConfigureAwait(false);
-#else
-                var clientSocket = await _socket.AcceptAsync().ConfigureAwait(false);
-#endif
-                return new CrossPlatformSocket(clientSocket);
+                await _networkStream.DisposeAsync().ConfigureAwait(false);
             }
-            catch (ObjectDisposedException)
-            {
-                // This will happen when _socket.EndAccept gets called by Task library but the socket is already disposed.
-                return null;
-            }
+
+            await _socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+            _networkStream = new NetworkStream(_socket, true);
         }
-
-        public EndPoint LocalEndPoint => _socket.LocalEndPoint;
-
-        public void Bind(EndPoint localEndPoint)
+        catch (SocketException socketException)
         {
-            if (localEndPoint is null)
+            if (socketException.SocketErrorCode == SocketError.OperationAborted)
             {
-                throw new ArgumentNullException(nameof(localEndPoint));
+                throw new OperationCanceledException();
             }
 
-            _socket.Bind(localEndPoint);
-        }
-
-        public void Listen(int connectionBacklog)
-        {
-            _socket.Listen(connectionBacklog);
-        }
-
-        public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken)
-        {
-            if (host is null)
+            if (socketException.SocketErrorCode == SocketError.TimedOut)
             {
-                throw new ArgumentNullException(nameof(host));
+                throw new MqttCommunicationTimedOutException();
             }
 
+            throw new MqttCommunicationException($"Error while connecting host '{endPoint}'.", socketException);
+        }
+        catch (ObjectDisposedException)
+        {
+            // This will happen when _socket.EndConnect_ gets called by Task library but the socket is already disposed.
             cancellationToken.ThrowIfCancellationRequested();
-
-            try
-            {
-                _networkStream?.Dispose();
-
-#if NET5_0_OR_GREATER
-                await _socket.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
-#else
-                // Workaround for: https://github.com/dotnet/corefx/issues/24430
-                using (cancellationToken.Register(_socketDisposeAction))
-                {
-#if NET452 || NET461
-                    await Task.Factory.FromAsync(_socket.BeginConnect, _socket.EndConnect, host, port, null).ConfigureAwait(false);
-#else
-                    await _socket.ConnectAsync(host, port).ConfigureAwait(false);
-#endif
-                }
-#endif
-                _networkStream = new NetworkStream(_socket, true);
-            }
-            catch (SocketException socketException)
-            {
-                if (socketException.SocketErrorCode == SocketError.OperationAborted)
-                {
-                    throw new OperationCanceledException();
-                }
-
-                if (socketException.SocketErrorCode == SocketError.TimedOut)
-                {
-                    throw new MqttCommunicationTimedOutException();
-                }
-
-                throw new MqttCommunicationException($"Error while connecting with host '{host}:{port}'.", socketException);
-            }
-            catch (ObjectDisposedException)
-            {
-                // This will happen when _socket.EndConnect gets called by Task library but the socket is already disposed.
-                cancellationToken.ThrowIfCancellationRequested();
-            }
         }
+    }
 
-        public async Task SendAsync(ArraySegment<byte> buffer, SocketFlags socketFlags)
+    public void Dispose()
+    {
+        _networkStream?.Dispose();
+        _socket?.Dispose();
+    }
+
+    public NetworkStream GetStream()
+    {
+        var networkStream = _networkStream;
+        if (networkStream == null)
         {
-            try
-            {
-#if NET452 || NET461
-                await Task.Factory.FromAsync(SocketWrapper.BeginSend, _socket.EndSend, new SocketWrapper(_socket, buffer, socketFlags)).ConfigureAwait(false);
-#else
-                await _socket.SendAsync(buffer, socketFlags).ConfigureAwait(false);
-#endif
-            }
-            catch (ObjectDisposedException)
-            {
-                // This will happen when _socket.EndConnect gets called by Task library but the socket is already disposed.
-            }
+            throw new IOException("The socket is not connected.");
         }
 
-        public async Task<int> ReceiveAsync(ArraySegment<byte> buffer, SocketFlags socketFlags)
-        {
-            try
-            {
-#if NET452 || NET461
-                return await Task.Factory.FromAsync(SocketWrapper.BeginReceive, _socket.EndReceive, new SocketWrapper(_socket, buffer, socketFlags)).ConfigureAwait(false);
-#else
-                return await _socket.ReceiveAsync(buffer, socketFlags).ConfigureAwait(false);
-#endif
-            }
-            catch (ObjectDisposedException)
-            {
-                // This will happen when _socket.EndReceive gets called by Task library but the socket is already disposed.
-                return -1;
-            }
-        }
+        return networkStream;
+    }
 
-        public NetworkStream GetStream()
-        {
-            var networkStream = _networkStream;
-            if (networkStream == null)
-            {
-                throw new IOException("The socket is not connected.");
-            }
+    public void Listen(int connectionBacklog)
+    {
+        _socket.Listen(connectionBacklog);
+    }
 
-            return networkStream;
-        }
+    public Task<int> ReceiveAsync(ArraySegment<byte> buffer, SocketFlags socketFlags)
+    {
+        return _socket.ReceiveAsync(buffer, socketFlags);
+    }
 
-        public void Dispose()
-        {
-            _networkStream?.Dispose();
-            _socket?.Dispose();
-        }
-
-#if NET452 || NET461
-        sealed class SocketWrapper
-        {
-            readonly Socket _socket;
-            readonly ArraySegment<byte> _buffer;
-            readonly SocketFlags _socketFlags;
-
-            public SocketWrapper(Socket socket, ArraySegment<byte> buffer, SocketFlags socketFlags)
-            {
-                _socket = socket;
-                _buffer = buffer;
-                _socketFlags = socketFlags;
-            }
-
-            public static IAsyncResult BeginSend(AsyncCallback callback, object state)
-            {
-                var socketWrapper = (SocketWrapper)state;
-                return socketWrapper._socket.BeginSend(socketWrapper._buffer.Array, socketWrapper._buffer.Offset, socketWrapper._buffer.Count, socketWrapper._socketFlags, callback, state);
-            }
-
-            public static IAsyncResult BeginReceive(AsyncCallback callback, object state)
-            {
-                var socketWrapper = (SocketWrapper)state;
-                return socketWrapper._socket.BeginReceive(socketWrapper._buffer.Array, socketWrapper._buffer.Offset, socketWrapper._buffer.Count, socketWrapper._socketFlags, callback, state);
-            }
-        }
-#endif
+    public Task SendAsync(ArraySegment<byte> buffer, SocketFlags socketFlags)
+    {
+        return _socket.SendAsync(buffer, socketFlags);
     }
 }

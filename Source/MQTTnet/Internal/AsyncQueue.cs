@@ -11,19 +11,55 @@ namespace MQTTnet.Internal
 {
     public sealed class AsyncQueue<TItem> : IDisposable
     {
+        readonly AsyncSignal _signal = new AsyncSignal();
         readonly object _syncRoot = new object();
-        SemaphoreSlim _semaphore = new SemaphoreSlim(0);
+
         ConcurrentQueue<TItem> _queue = new ConcurrentQueue<TItem>();
 
+        bool _isDisposed;
+
         public int Count => _queue.Count;
+
+        public void Clear()
+        {
+            _queue.Clear();
+        }
+
+        public void Dispose()
+        {
+            lock (_syncRoot)
+            {
+                _signal.Dispose();
+
+                _isDisposed = true;
+
+                if (typeof(IDisposable).IsAssignableFrom(typeof(TItem)))
+                {
+                    while (_queue.TryDequeue(out TItem item))
+                    {
+                        (item as IDisposable).Dispose();
+                    }
+                }
+            }
+        }
 
         public void Enqueue(TItem item)
         {
             lock (_syncRoot)
             {
                 _queue.Enqueue(item);
-                _semaphore?.Release();
+                _signal.Set();
             }
+        }
+
+        public AsyncQueueDequeueResult<TItem> TryDequeue()
+        {
+            if (_queue.TryDequeue(out var item))
+            {
+                return AsyncQueueDequeueResult<TItem>.Success(item);
+            }
+
+            return AsyncQueueDequeueResult<TItem>.NonSuccess;
         }
 
         public async Task<AsyncQueueDequeueResult<TItem>> TryDequeueAsync(CancellationToken cancellationToken)
@@ -32,65 +68,42 @@ namespace MQTTnet.Internal
             {
                 try
                 {
-                    Task task;
+                    Task task = null;
                     lock (_syncRoot)
                     {
-                        if (_semaphore == null)
+                        if (_isDisposed)
                         {
-                            return new AsyncQueueDequeueResult<TItem>(false, default);
+                            return AsyncQueueDequeueResult<TItem>.NonSuccess;
                         }
 
-                        task = _semaphore.WaitAsync(cancellationToken);
+                        if (_queue.IsEmpty)
+                        {
+                            task = _signal.WaitAsync(cancellationToken);
+                        }
                     }
-                    
-                    await task.ConfigureAwait(false);
+
+                    if (task != null)
+                    {
+                        await task.ConfigureAwait(false);
+                    }
 
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        return new AsyncQueueDequeueResult<TItem>(false, default);
+                        return AsyncQueueDequeueResult<TItem>.NonSuccess;
                     }
 
                     if (_queue.TryDequeue(out var item))
                     {
-                        return new AsyncQueueDequeueResult<TItem>(true, item);
+                        return AsyncQueueDequeueResult<TItem>.Success(item);
                     }
-                }
-                catch (ArgumentNullException)
-                {
-                    // The semaphore throws this internally sometimes.
-                    return new AsyncQueueDequeueResult<TItem>(false, default);
                 }
                 catch (OperationCanceledException)
                 {
-                    return new AsyncQueueDequeueResult<TItem>(false, default);
+                    return AsyncQueueDequeueResult<TItem>.NonSuccess;
                 }
             }
 
-            return new AsyncQueueDequeueResult<TItem>(false, default);
-        }
-
-        public AsyncQueueDequeueResult<TItem> TryDequeue()
-        {
-            if (_queue.TryDequeue(out var item))
-            {
-                return new AsyncQueueDequeueResult<TItem>(true, item);
-            }
-
-            return new AsyncQueueDequeueResult<TItem>(false, default);
-        }
-
-        public void Clear()
-        {
-            Interlocked.Exchange(ref _queue, new ConcurrentQueue<TItem>());
-        }
-
-        public void Dispose()
-        {
-            lock (_syncRoot)
-            {
-                _semaphore?.Dispose();
-                _semaphore = null;
-            }
+            return AsyncQueueDequeueResult<TItem>.NonSuccess;
         }
     }
 }

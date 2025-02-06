@@ -24,17 +24,22 @@ namespace MQTTnet.Formatter
             _bufferWriter = mqttBufferWriter ?? throw new ArgumentNullException(nameof(mqttBufferWriter));
         }
 
-        public MqttPacketFormatterAdapter(MqttProtocolVersion protocolVersion, MqttBufferWriter bufferWriter) : this(bufferWriter)
+        public MqttPacketFormatterAdapter(MqttProtocolVersion protocolVersion, MqttBufferWriter bufferWriter)
+            : this(bufferWriter)
         {
             UseProtocolVersion(protocolVersion);
         }
 
         public MqttProtocolVersion ProtocolVersion { get; private set; } = MqttProtocolVersion.Unknown;
 
+        public void Cleanup()
+        {
+            _bufferWriter.Cleanup();
+        }
+
         public MqttPacket Decode(ReceivedMqttPacket receivedMqttPacket)
         {
             ThrowIfFormatterNotSet();
-
             return _formatter.Decode(receivedMqttPacket);
         }
 
@@ -50,11 +55,6 @@ namespace MQTTnet.Formatter
             return _formatter.Encode(packet);
         }
 
-        public void Cleanup()
-        {
-            _bufferWriter.Cleanup();
-        }
-
         public static IMqttPacketFormatter GetMqttPacketFormatter(MqttProtocolVersion protocolVersion, MqttBufferWriter bufferWriter)
         {
             if (protocolVersion == MqttProtocolVersion.Unknown)
@@ -65,18 +65,18 @@ namespace MQTTnet.Formatter
             switch (protocolVersion)
             {
                 case MqttProtocolVersion.V500:
-                {
-                    return new MqttV5PacketFormatter(bufferWriter);
-                }
+                    {
+                        return new MqttV5PacketFormatter(bufferWriter);
+                    }
                 case MqttProtocolVersion.V310:
                 case MqttProtocolVersion.V311:
-                {
-                    return new MqttV3PacketFormatter(bufferWriter, protocolVersion);
-                }
+                    {
+                        return new MqttV3PacketFormatter(bufferWriter, protocolVersion);
+                    }
                 default:
-                {
-                    throw new NotSupportedException();
-                }
+                    {
+                        throw new NotSupportedException();
+                    }
             }
         }
 
@@ -94,6 +94,10 @@ namespace MQTTnet.Formatter
 
             var protocolName = _bufferReader.ReadString();
             var protocolLevel = _bufferReader.ReadByte();
+
+            // Remove the mosquitto try_private flag (MQTT 3.1.1 Bridge).
+            // This flag is accepted but not yet used.
+            protocolLevel &= 0x7F;
 
             if (protocolName == "MQTT")
             {

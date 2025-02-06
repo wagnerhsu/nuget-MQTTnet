@@ -2,46 +2,34 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using MQTTnet.Client;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 
-namespace MQTTnet.Formatter
+namespace MQTTnet.Formatter;
+
+public static class MqttDisconnectPacketFactory
 {
-    public sealed class MqttDisconnectPacketFactory
+    static readonly MqttDisconnectPacket DefaultNormalDisconnection = new()
     {
-        readonly MqttDisconnectPacket _normalDisconnection = new MqttDisconnectPacket
+        ReasonCode = MqttDisconnectReasonCode.NormalDisconnection,
+        UserProperties = null,
+        ReasonString = null,
+        ServerReference = null,
+        SessionExpiryInterval = 0
+    };
+
+    public static MqttDisconnectPacket Create(MqttClientDisconnectOptions clientDisconnectOptions)
+    {
+        if (clientDisconnectOptions == null)
         {
-            ReasonCode = MqttDisconnectReasonCode.NormalDisconnection
+            return DefaultNormalDisconnection;
+        }
+
+        return new MqttDisconnectPacket
+        {
+            ReasonCode = (MqttDisconnectReasonCode)clientDisconnectOptions.Reason,
+            UserProperties = clientDisconnectOptions.UserProperties,
+            SessionExpiryInterval = clientDisconnectOptions.SessionExpiryInterval
         };
-
-        public MqttDisconnectPacket Create(MqttDisconnectReasonCode reasonCode)
-        {
-            if (reasonCode == MqttDisconnectReasonCode.NormalDisconnection)
-            {
-                return _normalDisconnection;
-            }
-
-            return new MqttDisconnectPacket
-            {
-                ReasonCode = reasonCode
-            };
-        }
-
-        public MqttDisconnectPacket Create(MqttClientDisconnectOptions clientDisconnectOptions)
-        {
-            var packet = new MqttDisconnectPacket();
-
-            if (clientDisconnectOptions == null)
-            {
-                packet.ReasonCode = MqttDisconnectReasonCode.NormalDisconnection;
-            }
-            else
-            {
-                packet.ReasonCode = (MqttDisconnectReasonCode)clientDisconnectOptions.Reason;
-            }
-
-            return packet;
-        }
     }
 }
