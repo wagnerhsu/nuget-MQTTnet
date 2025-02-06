@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -11,7 +12,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MQTTnet.Client;
 using MQTTnet.Exceptions;
 using MQTTnet.Formatter;
 using MQTTnet.Internal;
@@ -27,7 +27,7 @@ namespace MQTTnet.Tests.Clients.MqttClient
     [TestClass]
     public sealed class MqttClient_Tests : BaseTestClass
     {
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(MqttQualityOfServiceLevel.ExactlyOnce)]
         [DataRow(MqttQualityOfServiceLevel.AtMostOnce)]
         [DataRow(MqttQualityOfServiceLevel.AtLeastOnce)]
@@ -86,7 +86,7 @@ namespace MQTTnet.Tests.Clients.MqttClient
                 await client.ConnectAsync(clientOptions);
             }
         }
-        
+
         [TestMethod]
         [ExpectedException(typeof(InvalidOperationException))]
         public async Task Connect_Multiple_Times_Should_Fail()
@@ -106,7 +106,7 @@ namespace MQTTnet.Tests.Clients.MqttClient
         [TestMethod]
         public async Task Disconnect_Event_Contains_Exception()
         {
-            var factory = new MqttFactory();
+            var factory = new MqttClientFactory();
             using (var client = factory.CreateMqttClient())
             {
                 Exception ex = null;
@@ -247,7 +247,7 @@ namespace MQTTnet.Tests.Clients.MqttClient
         [TestMethod]
         public async Task Invalid_Connect_Throws_Exception()
         {
-            var factory = new MqttFactory();
+            var factory = new MqttClientFactory();
             using (var client = factory.CreateMqttClient())
             {
                 try
@@ -297,7 +297,7 @@ namespace MQTTnet.Tests.Clients.MqttClient
 
                 Assert.IsNotNull(receivedMessage);
                 Assert.AreEqual("A", receivedMessage.Topic);
-                Assert.AreEqual(null, receivedMessage.PayloadSegment.Array);
+                Assert.AreEqual(0, receivedMessage.Payload.Length);
             }
         }
 
@@ -508,7 +508,7 @@ namespace MQTTnet.Tests.Clients.MqttClient
 
                 client2.ApplicationMessageReceivedAsync += e =>
                 {
-                    client2TopicResults.Add(Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment.ToArray()));
+                    client2TopicResults.Add(Encoding.UTF8.GetString(e.ApplicationMessage.Payload.ToArray()));
                     return CompletedTask.Instance;
                 };
 
@@ -748,8 +748,8 @@ namespace MQTTnet.Tests.Clients.MqttClient
                 {
                     if (e.ApplicationMessage.Topic == "request")
                     {
-                        // Use AtMostOnce here because with QoS 1 or even QoS 2 the process waits for 
-                        // the ACK etc. The problem is that the SpinUntil below only waits until the 
+                        // Use AtMostOnce here because with QoS 1 or even QoS 2 the process waits for
+                        // the ACK etc. The problem is that the SpinUntil below only waits until the
                         // flag is set. It does not wait until the client has sent the ACK
                         await client2.PublishStringAsync("reply");
                     }
